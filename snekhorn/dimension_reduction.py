@@ -8,18 +8,34 @@ import snekhorn.root_finding as root_finding
 OPTIMIZERS = {'Adam': torch.optim.Adam, 'SGD': torch.optim.SGD}
 
 class Affinity_matcher():
-    def __init__(self, kernel_in_Z, optimizer='Adam', verbose=True, tol=1e-4, max_iter=100, lr=1e-1, to_log=False):
+    def __init__(self, 
+                 affinity_in_Z, #both are two classes that computes the affinities
+                 affinity_in_X, 
+                 output_dim=2, 
+                 optimizer='Adam', 
+                 verbose=True, 
+                 tol=1e-4, 
+                 max_iter=100, 
+                 lr=1e-1, 
+                 to_log=False):
+        
+        assert optimizer in ['Adam', 'SGD']
         self.optimizer = optimizer
         self.verbose = verbose
         self.max_iter = max_iter
         self.lr = lr
         self.tol = tol
-        self.kernel_in_Z = kernel_in_Z
-        if self.to_log:
+        self.affinity_in_Z = affinity_in_Z #should be in log space
+        self.output_dim = output_dim
+        self.affinity_in_X = affinity_in_X
+        if to_log:
             self.log = {}
 
-    def match(self, PX, Z):
+    def fit(self, X):
+        n = X.shape[0]
+        P_X = self.affinity_in_X.compute_affinity(X)
         losses = []
+        Z = torch.normal(0, 1, size=(n, self.output_dim), dtype=torch.double)
         Z.requires_grad = True
         f = None
         optimizer = OPTIMIZERS[self.optimizer]([Z], lr=self.lr)
@@ -27,10 +43,10 @@ class Affinity_matcher():
         pbar = tqdm(range(self.max_iter))
         for k in pbar:
             optimizer.zero_grad()
-            log_Q = self.kernel_in_Z(Z) #not the best way
+            log_Q = self.affinity_in_Z.compute_affinity(Z) #not the best way
 
             # pytorch reverse the standard definition of the KL div and impose that the input is in log space to avoid overflow
-            loss = torch.nn.functional.kl_div(log_Q, PX, reduction='sum')
+            loss = torch.nn.functional.kl_div(log_Q, P_X, reduction='sum')
             if torch.isnan(loss):
                 raise Exception(f'NaN in loss at iteration {k}')
 
@@ -51,6 +67,42 @@ class Affinity_matcher():
         if self.to_log:
             self.log['loss'] = losses
         return Z.detach()
+    
+class SNEkhorn():
+    def __init__(self,
+                 perp, 
+                 output_dim=2, 
+                 optimizer='Adam', 
+                 verbose=True, 
+                 tol=1e-4, 
+                 max_iter=100, 
+                 lr=1e-1, 
+                 to_log=False,
+                 **args_sym_entropic):
+        self.perp = perp
+        self.output_dim = output_dim
+        self.optimizer = optimizer
+        self.verbose = verbose
+        self.tol = tol
+        self.max_iter = max_iter
+        self.lr = lr
+        self.to_log = to_log
+
+        def kernel_in_X(X):
+            C = torch.cdist(X, X, p=2)**2
+            P = symmetric_entropic_affinity(C, perp=perp, **args_sym_entropic)
+            return
+        
+        def kernel_in_Z(Z):
+            C = torch.cdist(Z, Z, p=2)**2
+            log_Q, f = log_selfsink(C=C, eps=eps, f=f, student=student)
+        affinity_matcher = Affinity_matcher()
+
+
+def SSNE(X, Z, perp, **coupling_kwargs):
+    C = torch.cdist(X, X, p=2)**2
+    P = symmetric_entropic_affinity(C, perp=perp)
+    return affinity_coupling(P, Z, **coupling_kwargs)
 
 # ---------- Dimension reduction methods related to stochastic neighbor embedding, including ours ----------
 
