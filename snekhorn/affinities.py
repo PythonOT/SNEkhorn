@@ -103,6 +103,7 @@ class Symmetric_entropic_affinity():
     def compute_log_affinity(self, X):
         C = torch.cdist(X, X, 2)**2
         log_P = self.symmetric_entropic_affinity(C)
+        return log_P
 
     def symmetric_entropic_affinity(self, C):
         n = C.shape[0]
