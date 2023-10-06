@@ -30,14 +30,13 @@ def log_Pe(C: torch.Tensor,
 
 
 class Entropic_affinity():
-    def __init__(self, perp, tol=1e-5, max_iter=1000, verbose=True, begin=None, end=None, output_log=False, normalize_as_sne=True):
+    def __init__(self, perp, tol=1e-5, max_iter=1000, verbose=True, begin=None, end=None, normalize_as_sne=True):
         self.perp = perp
         self.tol = tol
         self.max_iter = max_iter
         self.verbose = verbose
         self.begin = begin
         self.end = end
-        self.output_log = output_log
         self.normalize_as_sne=normalize_as_sne
 
     def compute_affinity(self, X):
@@ -69,8 +68,6 @@ class Entropic_affinity():
                 maximum iterations for the binary search
             verbose: bool
                 if True, prints current mean and std entropy values and current bounds 
-            output_log: bool
-                if True, outputs the affinity in log domain 
         """
         target_entropy = np.log(self.perp) + 1
         n = C.shape[0]
