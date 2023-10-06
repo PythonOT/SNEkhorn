@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import ot
 from matplotlib import cm
 import numpy as np
-from snekhorn.affinities import sne_affinity, symmetric_entropic_affinity
+from snekhorn.affinities import SymmetricEntropicAffinity, EntropicAffinity, BistochasticAffinity
 #%%
 seed=2
 torch.manual_seed(seed)
@@ -13,10 +13,15 @@ X1 = torch.Tensor([-8,-8])[None,:] + torch.normal(0, 1, size=(n, 2), dtype=torch
 X2 = torch.Tensor([0,8])[None,:] + torch.normal(0, 3, size=(n, 2), dtype=torch.double)
 X3 = torch.Tensor([8,-8])[None,:] + torch.normal(0, 2, size=(n, 2), dtype=torch.double)
 X = torch.cat([X1,X2,X3], 0)
-C = torch.cdist(X,X,2)**2
-n = 3*n
-nu = 2
-K = torch.exp(-C/nu)
+perp = 5
+SEA = SymmetricEntropicAffinity(perp=perp, lr=1e-1)
+bisto_a = BistochasticAffinity(eps=2)
+EA = EntropicAffinity(perp=perp, normalize_as_sne=True)
+K = torch.exp(-torch.cdist(X,X)**2/2.0)
+
+Pds = bisto_a.compute_affinity(X)
+Psne = EA.compute_affinity(X)
+Pse = SEA.compute_affinity(X)
 #%%
 plt.close('all')
 plt.figure(1, (10,3))
@@ -39,9 +44,6 @@ for i in range(n):
 plt.scatter(X[:,0], X[:,1],alpha=0.5)
 plt.title("Affinity graph")
 plt.show()
-# %%
-nu = 2
-Pds = ot.sinkhorn(torch.ones(n), torch.ones(n), C, nu)
 
 #%%
 
@@ -70,17 +72,13 @@ for i in range(n):
 plt.scatter(X[:,0], X[:,1],alpha=0.5)
 plt.title("Affinity graph")
 plt.show()
-# %%
-perp=5
-
-Pe = sne_affinity(C,perp)
 
 #%%
 
 plt.close('all')
 plt.figure(1, (10,3))
 
-Kvisu = Pe.detach().numpy()
+Kvisu = Psne.detach().numpy()
 Kvisu = Kvisu/np.max(Kvisu)
 vmax=0.5
 scale=1
@@ -105,11 +103,6 @@ plt.title("Affinity graph")
 plt.show()
 
 #%%
-
-perp=5
-
-Pse = symmetric_entropic_affinity(C, perp, lr=1e-1)
-
 plt.close('all')
 plt.figure(1, (10,3))
 

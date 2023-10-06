@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import snekhorn.root_finding as root_finding
 from tqdm import tqdm
-import time
 from snekhorn.utils import entropy
 
 OPTIMIZERS = {'SGD': torch.optim.SGD,
@@ -11,25 +10,13 @@ OPTIMIZERS = {'SGD': torch.optim.SGD,
               'NAdam': torch.optim.NAdam,
               'LBFGS': torch.optim.LBFGS}
 
-
-def log_Pe(C: torch.Tensor,
-           eps: torch.Tensor):
-    """
-        Returns the log of the directed affinity matrix of SNE.
-
-        Parameters
-        ----------
-        C: array (n,n) 
-            distance matrix
-        eps: array (n)
-            kernel bandwidths vector
-    """
-    log_P = - C / (eps[:, None])
-    return log_P - torch.logsumexp(log_P, -1, keepdim=True)
+class LogAffinity():
+    def compute_affinity(self, X):
+        log_P = self.compute_log_affinity(X)
+        return torch.exp(log_P)
 
 
-
-class Entropic_affinity():
+class EntropicAffinity(LogAffinity):
     def __init__(self, perp, tol=1e-5, max_iter=1000, verbose=True, begin=None, end=None, normalize_as_sne=True):
         self.perp = perp
         self.tol = tol
@@ -38,11 +25,7 @@ class Entropic_affinity():
         self.begin = begin
         self.end = end
         self.normalize_as_sne=normalize_as_sne
-
-    def compute_affinity(self, X):
-        log_P = self.compute_log_affinity(X)
-        return torch.exp(log_P)
-    
+        
     def compute_log_affinity(self, X):
         C = torch.cdist(X, X, 2)**2
         log_P = self.entropic_affinity(C)
@@ -81,7 +64,7 @@ class Entropic_affinity():
         return log_affinity
     
 
-class Symmetric_entropic_affinity():
+class SymmetricEntropicAffinity(LogAffinity):
     def __init__(self, perp, lr=1e-3, tol=1e-3, max_iter=10000, optimizer='Adam', verbose=True, tolog=False, squared_parametrization=True):
         self.perp = perp
         self.lr = lr
@@ -89,14 +72,11 @@ class Symmetric_entropic_affinity():
         self.max_iter = max_iter
         self.optimizer = optimizer
         self.verbose = verbose
+        self.tolog = tolog
         if tolog:
             self.log = {}
         self.squared_parametrization = squared_parametrization
 
-    def compute_affinity(self, X):
-        log_P = self.compute_log_affinity(X)
-        return torch.exp(log_P)
-    
     def compute_log_affinity(self, X):
         C = torch.cdist(X, X, 2)**2
         log_P = self.symmetric_entropic_affinity(C)
@@ -110,7 +90,7 @@ class Symmetric_entropic_affinity():
         mu = torch.zeros(n, dtype=torch.double)
         log_P = log_Pse(C, eps, mu, to_square=self.squared_parametrization)
 
-        optimizer = OPTIMIZERS[optimizer]([eps, mu], lr=self.lr)
+        optimizer = OPTIMIZERS[self.optimizer]([eps, mu], lr=self.lr)
 
         if self.tolog:
             self.log['eps'] = [eps.clone().detach()]
@@ -171,8 +151,89 @@ class Symmetric_entropic_affinity():
 
         return log_P
 
-# ----- Symmetric Entropic Affinity -----
 
+class BistochasticAffinity(LogAffinity):
+    def __init__(self, eps=1.0, f=None, tol=1e-5, max_iter=1000, student=False, tolog=False):
+        self.eps = eps
+        self.f = f
+        self.tol = tol
+        self.max_iter = max_iter
+        self.student = student
+        self.tolog = tolog
+        if tolog:
+            self.log = {}
+    
+    def compute_log_affinity(self, X):
+        C = torch.cdist(X, X, 2)**2
+        # If student is True, considers the Student-t kernel instead of Gaussian
+        if self.student:
+            C = torch.log(1+C)
+        log_P = self.log_selfsink(C)
+        return log_P
+
+    def log_selfsink(self, C):
+        """ 
+            Performs Sinkhorn iterations in log domain to solve the entropic "self" (or "symmetric") OT problem with symmetric cost C and entropic regularization epsilon.
+            Returns the transport plan and dual variable at convergence.
+
+            Parameters
+            ----------
+            C: array (n,n)
+                symmetric distance matrix
+            eps: float
+                entropic regularization coefficient
+            f: array(n)
+                initial dual variable
+            tol: float
+                precision threshold at which the algorithm stops
+            max_iter: int
+                maximum number of Sinkhorn iterations
+            student: bool
+                if True, a Student-t kernel is considered instead of Gaussian
+            tolog: bool
+                if True, log and returns intermediate variables
+        """
+        n = C.shape[0]
+
+        # Allows a warm-start if a dual variable f is provided
+        f = torch.zeros(n) if self.f is None else self.f
+
+        if self.tolog:
+            self.log['f'] .append(f.clone())
+
+        # Sinkhorn iterations
+        for k in range(self.max_iter+1):
+            f = 0.5 * (f - self.eps*torch.logsumexp((f - C) / self.eps, -1))
+
+            if self.tolog:
+                self.log['f'].append(f.clone())        
+
+            if torch.isnan(f).any():
+                raise Exception(f'NaN in self-Sinkhorn dual variable at iteration {k}')
+
+            log_T = (f[:,None] + f[None,:] - C) / self.eps
+            if (torch.abs(torch.exp(torch.logsumexp(log_T, -1))-1) < self.tol).all():
+                break
+
+            if k == self.max_iter-1:
+                print('---------- Max iter attained ----------')
+
+        return (f[:,None] + f[None,:] - C) / self.eps
+
+def log_Pe(C: torch.Tensor,
+           eps: torch.Tensor):
+    """
+        Returns the log of the directed affinity matrix of SNE.
+
+        Parameters
+        ----------
+        C: array (n,n) 
+            distance matrix
+        eps: array (n)
+            kernel bandwidths vector
+    """
+    log_P = - C / (eps[:, None])
+    return log_P - torch.logsumexp(log_P, -1, keepdim=True)
 
 
 def log_Pse(C: torch.Tensor,
@@ -206,65 +267,3 @@ def Lagrangian(C, log_P, eps, mu, perp=30):
     HP = entropy(log_P, log=True, ax=1)
     return torch.exp(torch.logsumexp(log_P + torch.log(C), (0,1), keepdim=False)) + torch.inner(eps, (target_entropy - HP)) + torch.inner(mu, (one - torch.exp(torch.logsumexp(log_P, -1, keepdim=False))))
 
-def log_selfsink(C: torch.Tensor, 
-                eps: float=1.,
-                f: torch.Tensor=None,
-                tol: float=1e-5,
-                max_iter: int=1000,
-                student: bool=False,
-                tolog: bool=False):
-    """ 
-        Performs Sinkhorn iterations in log domain to solve the entropic "self" (or "symmetric") OT problem with symmetric cost C and entropic regularization epsilon.
-        Returns the transport plan and dual variable at convergence.
-
-        Parameters
-        ----------
-        C: array (n,n)
-            symmetric distance matrix
-        eps: float
-            entropic regularization coefficient
-        f: array(n)
-            initial dual variable
-        tol: float
-            precision threshold at which the algorithm stops
-        max_iter: int
-            maximum number of Sinkhorn iterations
-        student: bool
-            if True, a Student-t kernel is considered instead of Gaussian
-        tolog: bool
-            if True, log and returns intermediate variables
-    """
-    n = C.shape[0]
-
-    # Allows a warm-start if a dual variable f is provided
-    f = torch.zeros(n) if f is None else f.clone().detach()
-
-    if tolog:
-        log = {}
-        log['f'] = [f.clone().detach()]
-
-    # If student is True, considers the Student-t kernel instead of Gaussian
-    if student:
-        C = torch.log(1+C)
-
-    # Sinkhorn iterations
-    for k in range(max_iter+1):
-        f = 0.5 * (f - eps*torch.logsumexp((f - C) / eps,-1))
-
-        if tolog:
-            log['f'].append(f.clone().detach())        
-
-        if torch.isnan(f).any():
-            raise Exception(f'NaN in self-Sinkhorn dual variable at iteration {k}')
-
-        log_T = (f[:,None] + f[None,:] - C) / eps
-        if (torch.abs(torch.exp(torch.logsumexp(log_T, -1))-1) < tol).all():
-            break
-
-        if k == max_iter-1:
-            print('---------- Max iter attained ----------')
-
-    if tolog:
-        return (f[:,None] + f[None,:] - C) / eps, f, log
-    else:
-        return (f[:,None] + f[None,:] - C) / eps, f
