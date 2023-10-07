@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import ot
 from matplotlib import cm
 import numpy as np
-from snekhorn.affinities import SymmetricEntropicAffinity, EntropicAffinity, BistochasticAffinity
+from snekhorn.affinities import SymmetricEntropicAffinity, EntropicAffinity, BistochasticAffinity, BaseAffinity
 #%%
 seed=2
 torch.manual_seed(seed)
@@ -19,6 +19,7 @@ bisto_a = BistochasticAffinity(eps=2)
 EA = EntropicAffinity(perp=perp, normalize_as_sne=True)
 K = torch.exp(-torch.cdist(X,X)**2/2.0)
 
+#%%
 Pds = bisto_a.compute_affinity(X)
 Psne = EA.compute_affinity(X)
 Pse = SEA.compute_affinity(X)
