@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
 from snekhorn import SNEkhorn
+from snekhorn.dimension_reduction import tSNE
 #%%
 seed=2
 torch.manual_seed(seed)
@@ -14,6 +15,7 @@ X3 = torch.Tensor([8,-8])[None,:] + torch.normal(0, 2, size=(n, 2), dtype=torch.
 X = torch.cat([X1,X2,X3], 0)
 #%%
 tsnekhorn = SNEkhorn(perp=5)
+tsne = tSNE(perp=5)
 # %%
 tsnekhorn.fit(X)
 # %%

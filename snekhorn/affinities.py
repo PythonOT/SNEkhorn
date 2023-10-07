@@ -17,6 +17,21 @@ class BaseAffinity():
         return torch.exp(log_P)
 
 
+class NormalizedGaussianAndStudentAffinity(BaseAffinity):
+    def __init__(self, student=False, sigma=1.0, p=2):
+        self.student = student
+        self.sigma = sigma
+        self.p = p
+
+    def compute_log_affinity(self, X):
+        C = torch.cdist(X, X, self.p)**2
+        if self.student:
+            log_P = - torch.log(1 + C)
+        else:
+            log_P = - 1.0 / (2*self.sigma) * C
+        return log_P - torch.logsumexp(log_P, dim=(0, 1))  # not sure of this
+
+
 class EntropicAffinity(BaseAffinity):
     def __init__(self,
                  perp,
