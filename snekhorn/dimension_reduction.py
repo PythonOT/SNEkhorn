@@ -162,7 +162,7 @@ class SNE(AffinityMatcher):
         affinity_in_Z = NormalizedGaussianAndStudentAffinity(
             student=student_kernel)
 
-        super(tSNE, self).__init__(affinity_in_Z=affinity_in_Z,
+        super(SNE, self).__init__(affinity_in_Z=affinity_in_Z,
                                    affinity_in_X=entropic_affinity,
                                    output_dim=output_dim,
                                    optimizer=optimizer,
