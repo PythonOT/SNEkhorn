@@ -18,12 +18,42 @@ class BaseAffinity():
 
 
 class NormalizedGaussianAndStudentAffinity(BaseAffinity):
+    """_summary_
+
+    Parameters
+    ----------
+    BaseAffinity : _type_
+        _description_
+    """    
     def __init__(self, student=False, sigma=1.0, p=2):
+        """_summary_
+
+        Parameters
+        ----------
+        student : bool, optional
+            _description_, by default False
+        sigma : float, optional
+            _description_, by default 1.0
+        p : int, optional
+            _description_, by default 2
+        """
         self.student = student
         self.sigma = sigma
         self.p = p
 
     def compute_log_affinity(self, X):
+        """_summary_
+
+        Parameters
+        ----------
+        X : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """        
         C = torch.cdist(X, X, self.p)**2
         if self.student:
             log_P = - torch.log(1 + C)
@@ -33,6 +63,13 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
 
 
 class EntropicAffinity(BaseAffinity):
+    """_summary_
+
+    Parameters
+    ----------
+    BaseAffinity : _type_
+        _description_
+    """    
     def __init__(self,
                  perp,
                  tol=1e-5,
@@ -41,6 +78,25 @@ class EntropicAffinity(BaseAffinity):
                  begin=None,
                  end=None,
                  normalize_as_sne=True):
+        """_summary_
+
+        Parameters
+        ----------
+        perp : _type_
+            _description_
+        tol : _type_, optional
+            _description_, by default 1e-5
+        max_iter : int, optional
+            _description_, by default 1000
+        verbose : bool, optional
+            _description_, by default True
+        begin : _type_, optional
+            _description_, by default None
+        end : _type_, optional
+            _description_, by default None
+        normalize_as_sne : bool, optional
+            _description_, by default True
+        """        
         self.perp = perp
         self.tol = tol
         self.max_iter = max_iter
@@ -50,6 +106,25 @@ class EntropicAffinity(BaseAffinity):
         self.normalize_as_sne = normalize_as_sne
 
     def compute_log_affinity(self, X):
+        """_summary_
+
+        Parameters
+        ----------
+        X : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """        """_summary_
+
+        Args:
+            X (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """        
         C = torch.cdist(X, X, 2)**2
         log_P = self.entropic_affinity(C)
         if self.normalize_as_sne:  # does P+P.T/2 in log space
@@ -99,6 +174,27 @@ class SymmetricEntropicAffinity(BaseAffinity):
                  verbose=True,
                  tolog=False,
                  squared_parametrization=True):
+        """_summary_
+
+        Parameters
+        ----------
+        perp : _type_
+            _description_
+        lr : _type_, optional
+            _description_, by default 1e-3
+        tol : _type_, optional
+            _description_, by default 1e-3
+        max_iter : int, optional
+            _description_, by default 10000
+        optimizer : str, optional
+            _description_, by default 'Adam'
+        verbose : bool, optional
+            _description_, by default True
+        tolog : bool, optional
+            _description_, by default False
+        squared_parametrization : bool, optional
+            _description_, by default True
+        """  
         self.perp = perp
         self.lr = lr
         self.tol = tol
@@ -111,11 +207,40 @@ class SymmetricEntropicAffinity(BaseAffinity):
         self.squared_parametrization = squared_parametrization
 
     def compute_log_affinity(self, X):
+        """_summary_
+
+        Parameters
+        ----------
+        X : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """        
         C = torch.cdist(X, X, 2)**2
         log_P = self.symmetric_entropic_affinity(C)
         return log_P
 
     def symmetric_entropic_affinity(self, C):
+        """_summary_
+
+        Parameters
+        ----------
+        C : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+
+        Raises
+        ------
+        Exception
+            _description_
+        """        
         n = C.shape[0]
         assert 1 <= self.perp <= n
         target_entropy = np.log(self.perp) + 1
@@ -187,6 +312,13 @@ class SymmetricEntropicAffinity(BaseAffinity):
 
 
 class BistochasticAffinity(BaseAffinity):
+    """_summary_
+
+    Parameters
+    ----------
+    BaseAffinity : _type_
+        _description_
+    """    
     def __init__(self,
                  eps=1.0,
                  f=None,
@@ -194,6 +326,23 @@ class BistochasticAffinity(BaseAffinity):
                  max_iter=1000,
                  student=False,
                  tolog=False):
+        """_summary_
+
+        Parameters
+        ----------
+        eps : float, optional
+            _description_, by default 1.0
+        f : _type_, optional
+            _description_, by default None
+        tol : _type_, optional
+            _description_, by default 1e-5
+        max_iter : int, optional
+            _description_, by default 1000
+        student : bool, optional
+            _description_, by default False
+        tolog : bool, optional
+            _description_, by default False
+        """        
         self.eps = eps
         self.f = f
         self.tol = tol
@@ -204,6 +353,18 @@ class BistochasticAffinity(BaseAffinity):
             self.log = {}
 
     def compute_log_affinity(self, X):
+        """_summary_
+
+        Parameters
+        ----------
+        X : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """        
         C = torch.cdist(X, X, 2)**2
         # If student is True, considers the Student-t kernel instead of Gaussian
         if self.student:
@@ -302,6 +463,26 @@ def log_Pse(C: torch.Tensor,
 
 
 def Lagrangian(C, log_P, eps, mu, perp=30):
+    """_summary_
+
+    Parameters
+    ----------
+    C : _type_
+        _description_
+    log_P : _type_
+        _description_
+    eps : _type_
+        _description_
+    mu : _type_
+        _description_
+    perp : int, optional
+        _description_, by default 30
+
+    Returns
+    -------
+    _type_
+        _description_
+    """    
     # TBD
     one = torch.ones(C.shape[0], dtype=torch.double)
     target_entropy = np.log(perp) + 1

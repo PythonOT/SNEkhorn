@@ -16,6 +16,22 @@ OPTIMIZERS = {'Adam': torch.optim.Adam, 'SGD': torch.optim.SGD}
 
 
 class AffinityMatcher():
+    """_summary_
+
+    Returns
+    -------
+    _type_
+        _description_
+
+    Raises
+    ------
+    NotBaseAffinityError
+        _description_
+    NotImplementedError
+        _description_
+    Exception
+        _description_
+    """    
     # match two kernels as min_Z KL(P_X | Q_Z)
     def __init__(self,
                  affinity_in_Z,  # both are two BaseAffinity objects that computes the affinities
@@ -28,6 +44,34 @@ class AffinityMatcher():
                  lr=1e-1,
                  tolog=False,
                  init='random'):
+        """_summary_
+
+        Parameters
+        ----------
+        affinity_in_Z : _type_
+            _description_
+        optimizer : str, optional
+            _description_, by default 'Adam'
+        verbose : bool, optional
+            _description_, by default True
+        tol : _type_, optional
+            _description_, by default 1e-4
+        max_iter : int, optional
+            _description_, by default 100
+        lr : _type_, optional
+            _description_, by default 1e-1
+        tolog : bool, optional
+            _description_, by default False
+        init : str, optional
+            _description_, by default 'random'
+
+        Raises
+        ------
+        NotBaseAffinityError
+            _description_
+        NotImplementedError
+            _description_
+        """        
 
         assert optimizer in ['Adam', 'SGD']
         self.optimizer = optimizer
@@ -50,10 +94,43 @@ class AffinityMatcher():
             self.log = {}
 
     def fit(self, X, y=None):
+        """_summary_
+
+        Parameters
+        ----------
+        X : _type_
+            _description_
+        y : _type_, optional
+            _description_, by default None
+
+        Returns
+        -------
+        _type_
+            _description_
+        """        
         self.fit_transform(X)
         return self
 
     def fit_transform(self, X, y=None):
+        """_summary_
+
+        Parameters
+        ----------
+        X : _type_
+            _description_
+        y : _type_, optional
+            _description_, by default None
+
+        Returns
+        -------
+        _type_
+            _description_
+
+        Raises
+        ------
+        Exception
+            _description_
+        """        
         n = X.shape[0]
         P_X = self.affinity_in_X.compute_affinity(X)
         losses = []
@@ -96,6 +173,13 @@ class AffinityMatcher():
 
 
 class SNEkhorn(AffinityMatcher):
+    """_summary_
+
+    Parameters
+    ----------
+    AffinityMatcher : _type_
+        _description_
+    """    
     def __init__(self,
                  perp,
                  output_dim=2,
@@ -114,6 +198,41 @@ class SNEkhorn(AffinityMatcher):
                  max_iter_sinkhorn=100,
                  tol_sinkhorn=1e-5,
                  tolog=False):
+        """_summary_
+
+        Parameters
+        ----------
+        perp : _type_
+            _description_
+        output_dim : int, optional
+            _description_, by default 2
+        optimizer : str, optional
+            _description_, by default 'Adam'
+        verbose : bool, optional
+            _description_, by default True
+        tol : _type_, optional
+            _description_, by default 1e-4
+        max_iter : int, optional
+            _description_, by default 100
+        lr : _type_, optional
+            _description_, by default 1e-1
+        learning_rate_sea : _type_, optional
+            _description_, by default 1e-1
+        max_iter_sea : int, optional
+            _description_, by default 1000
+        tol_sea : _type_, optional
+            _description_, by default 1e-3
+        squared_parametrization : bool, optional
+            _description_, by default True
+        eps : float, optional
+            _description_, by default 1.0
+        student_kernel : bool, optional
+            _description_, by default False
+        tol_sinkhorn : _type_, optional
+            _description_, by default 1e-5
+        tolog : bool, optional
+            _description_, by default False
+        """        
 
         self.perp = perp
         symmetric_entropic_affinity = SymmetricEntropicAffinity(perp=perp,
@@ -143,6 +262,13 @@ class SNEkhorn(AffinityMatcher):
 
 
 class SNE(AffinityMatcher):
+    """_summary_
+
+    Parameters
+    ----------
+    AffinityMatcher : _type_
+        _description_
+    """    
     def __init__(self,
                  perp,
                  output_dim=2,
@@ -154,6 +280,29 @@ class SNE(AffinityMatcher):
                  tol_ea=1e-5,
                  student_kernel=False,  # True for tSNE
                  tolog=False):
+        """_summary_
+
+        Parameters
+        ----------
+        perp : _type_
+            _description_
+        output_dim : int, optional
+            _description_, by default 2
+        optimizer : str, optional
+            _description_, by default 'Adam'
+        verbose : bool, optional
+            _description_, by default True
+        tol : _type_, optional
+            _description_, by default 1e-4
+        max_iter : int, optional
+            _description_, by default 100
+        lr : _type_, optional
+            _description_, by default 1e-1
+        tol_ea : _type_, optional
+            _description_, by default 1e-5
+        student_kernel : bool, optional
+            _description_, by default False
+        """        
         self.perp = perp
         entropic_affinity = EntropicAffinity(perp=perp,
                                              tol=tol_ea,
