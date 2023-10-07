@@ -142,7 +142,7 @@ class SNEkhorn(AffinityMatcher):
                                        tolog=tolog)
 
 
-class tSNE(AffinityMatcher):
+class SNE(AffinityMatcher):
     def __init__(self,
                  perp,
                  output_dim=2,

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
 from snekhorn import SNEkhorn
-from snekhorn.dimension_reduction import tSNE
+from snekhorn.dimension_reduction import SNE
 #%%
 seed=2
 torch.manual_seed(seed)
@@ -15,12 +15,16 @@ X3 = torch.Tensor([8,-8])[None,:] + torch.normal(0, 2, size=(n, 2), dtype=torch.
 X = torch.cat([X1,X2,X3], 0)
 #%%
 tsnekhorn = SNEkhorn(perp=5)
-tsne = tSNE(perp=5)
+tsne = SNE(perp=5)
 # %%
 tsnekhorn.fit(X)
+#%%
+tsne.fit(X)
 # %%
-Z = tsnekhorn.embedding
+Zsnekhorn = tsnekhorn.embedding
+Zsne = tsne.embedding
 plt.scatter(X[:, 0], X[:, 1], label='data')
-plt.scatter(Z[:, 0], Z[:, 1], label='embedding')
+plt.scatter(Zsnekhorn[:, 0], Zsnekhorn[:, 1], label='tsnekhorn embedding')
+plt.scatter(Zsne[:, 0], Zsne[:, 1], label='tsne embedding')
 plt.legend()
 # %%
