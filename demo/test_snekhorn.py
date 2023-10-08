@@ -7,7 +7,7 @@ from snekhorn import SNEkhorn
 from snekhorn.affinities import NormalizedGaussianAndStudentAffinity
 from snekhorn.dimension_reduction import SNE
 #%%
-NormalizedGaussianAndStudentAffinity())
+NormalizedGaussianAndStudentAffinity()
 nn.compute_log_affinity()
 #%%
 seed=2
