@@ -1,6 +1,6 @@
 # Affinity matrices
 import torch
-import numpy as np
+import math
 import snekhorn.root_finding as root_finding
 from tqdm import tqdm
 from snekhorn.utils import entropy
@@ -18,48 +18,42 @@ class BaseAffinity():
 
 
 class NormalizedGaussianAndStudentAffinity(BaseAffinity):
-    """_summary_
+    """This class computes the normalized affinity associated to a Gaussian or t-Student kernel. The affinity matrix is normalized by its total sum.
 
     Parameters
     ----------
-    BaseAffinity : _type_
-        _description_
-    """    
-    def __init__(self, student=False, sigma=1.0, p=2):
-        """_summary_
+    student : bool, optional
+        if True computes a t-Student kernel, by default False
+    sigma : float, optional
+        The length scale of the Gaussian kernel, by default 1.0
+    p : int, optional
+        p value for the p-norm distance to calculate between each vector pair, by default 2
+    """
 
-        Parameters
-        ----------
-        student : bool, optional
-            _description_, by default False
-        sigma : float, optional
-            _description_, by default 1.0
-        p : int, optional
-            _description_, by default 2
-        """
+    def __init__(self, student=False, sigma=1.0, p=2):
         self.student = student
         self.sigma = sigma
         self.p = p
 
     def compute_log_affinity(self, X):
-        """_summary_
+        """Computes the pairwise affinity matrix in log space and normalize it by its total sum.
 
         Parameters
         ----------
-        X : _type_
-            _description_
+        X : torch Tensor of shape (n_samples, n_features)
+            data on which affinity is computed.
 
         Returns
         -------
-        _type_
-            _description_
-        """        
+        log_P: torch Tensor of shape (n_samples, n_samples)
+            affinity matrix in log space.
+        """
         C = torch.cdist(X, X, self.p)**2
         if self.student:
             log_P = - torch.log(1 + C)
         else:
             log_P = - 1.0 / (2*self.sigma) * C
-        return log_P - torch.logsumexp(log_P, dim=(0, 1))  # not sure of this
+        return log_P - torch.logsumexp(log_P, dim=(0, 1))
 
 
 class EntropicAffinity(BaseAffinity):
@@ -69,7 +63,8 @@ class EntropicAffinity(BaseAffinity):
     ----------
     BaseAffinity : _type_
         _description_
-    """    
+    """
+
     def __init__(self,
                  perp,
                  tol=1e-5,
@@ -96,7 +91,7 @@ class EntropicAffinity(BaseAffinity):
             _description_, by default None
         normalize_as_sne : bool, optional
             _description_, by default True
-        """        
+        """
         self.perp = perp
         self.tol = tol
         self.max_iter = max_iter
@@ -124,12 +119,12 @@ class EntropicAffinity(BaseAffinity):
 
         Returns:
             _type_: _description_
-        """        
+        """
         C = torch.cdist(X, X, 2)**2
         log_P = self.entropic_affinity(C)
         if self.normalize_as_sne:  # does P+P.T/2 in log space
             log_P_SNE = torch.logsumexp(torch.stack(
-                [log_P, log_P.T], 0), 0, keepdim=False) - np.log(2)
+                [log_P, log_P.T], 0), 0, keepdim=False) - math.log(2)
             return log_P_SNE
         else:
             return log_P
@@ -151,7 +146,7 @@ class EntropicAffinity(BaseAffinity):
             verbose: bool
                 if True, prints current mean and std entropy values and current bounds 
         """
-        target_entropy = np.log(self.perp) + 1
+        target_entropy = math.log(self.perp) + 1
         n = C.shape[0]
 
         def f(eps):
@@ -194,7 +189,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
             _description_, by default False
         squared_parametrization : bool, optional
             _description_, by default True
-        """  
+        """
         self.perp = perp
         self.lr = lr
         self.tol = tol
@@ -218,7 +213,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
         -------
         _type_
             _description_
-        """        
+        """
         C = torch.cdist(X, X, 2)**2
         log_P = self.symmetric_entropic_affinity(C)
         return log_P
@@ -240,10 +235,10 @@ class SymmetricEntropicAffinity(BaseAffinity):
         ------
         Exception
             _description_
-        """        
+        """
         n = C.shape[0]
         assert 1 <= self.perp <= n
-        target_entropy = np.log(self.perp) + 1
+        target_entropy = math.log(self.perp) + 1
         eps = torch.ones(n, dtype=torch.double)
         mu = torch.zeros(n, dtype=torch.double)
         log_P = log_Pse(C, eps, mu, to_square=self.squared_parametrization)
@@ -290,7 +285,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
                         eps_ = eps_**2
                         mu_ = mu.clone().detach()
                         self.log['loss'].append(-Lagrangian(C, torch.exp(log_P.clone().detach()),
-                                                eps_, mu_, self.perp, squared_parametrization=self.squared_parametrization).item())
+                                                            eps_, mu_, self.perp, squared_parametrization=self.squared_parametrization).item())
 
                 perps = torch.exp(H-1)
                 if self.verbose:
@@ -300,7 +295,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
                         f'marginal sum : {float(P_sum.mean().item()): .3e}, '
                         f'marginal std : {float(P_sum.std().item()): .3e}, ')
 
-                if (torch.abs(H - np.log(self.perp)-1) < self.tol).all() and (torch.abs(P_sum - one) < self.tol).all():
+                if (torch.abs(H - math.log(self.perp)-1) < self.tol).all() and (torch.abs(P_sum - one) < self.tol).all():
                     if self.verbose:
                         print(f'breaking at iter {k}')
                     break
@@ -318,7 +313,8 @@ class BistochasticAffinity(BaseAffinity):
     ----------
     BaseAffinity : _type_
         _description_
-    """    
+    """
+
     def __init__(self,
                  eps=1.0,
                  f=None,
@@ -342,7 +338,7 @@ class BistochasticAffinity(BaseAffinity):
             _description_, by default False
         tolog : bool, optional
             _description_, by default False
-        """        
+        """
         self.eps = eps
         self.f = f
         self.tol = tol
@@ -364,7 +360,7 @@ class BistochasticAffinity(BaseAffinity):
         -------
         _type_
             _description_
-        """        
+        """
         C = torch.cdist(X, X, 2)**2
         # If student is True, considers the Student-t kernel instead of Gaussian
         if self.student:
@@ -482,9 +478,9 @@ def Lagrangian(C, log_P, eps, mu, perp=30):
     -------
     _type_
         _description_
-    """    
+    """
     # TBD
     one = torch.ones(C.shape[0], dtype=torch.double)
-    target_entropy = np.log(perp) + 1
+    target_entropy = math.log(perp) + 1
     HP = entropy(log_P, log=True, ax=1)
     return torch.exp(torch.logsumexp(log_P + torch.log(C), (0, 1), keepdim=False)) + torch.inner(eps, (target_entropy - HP)) + torch.inner(mu, (one - torch.exp(torch.logsumexp(log_P, -1, keepdim=False))))
