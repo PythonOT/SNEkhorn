@@ -7,12 +7,32 @@ from snekhorn.utils import entropy
 
 OPTIMIZERS = {'SGD': torch.optim.SGD,
               'Adam': torch.optim.Adam,
-              'NAdam': torch.optim.NAdam,
-              'LBFGS': torch.optim.LBFGS}
+              'NAdam': torch.optim.NAdam
+              }
+
+
+class NanError(Exception):
+    pass
+
+
+class BadPerplexity(Exception):
+    pass
 
 
 class BaseAffinity():
     def compute_affinity(self, X):
+        """Computes an affinity matrix from an affinity matrix in log space.
+
+        Parameters
+        ----------
+        X : torch Tensor of shape (n_samples, n_features)
+            Data on which affinity is computed.
+
+        Returns
+        -------
+        P: torch Tensor of shape (n_samples, n_samples)
+            Affinity matrix.
+        """
         log_P = self.compute_log_affinity(X)
         return torch.exp(log_P)
 
@@ -23,11 +43,11 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
     Parameters
     ----------
     student : bool, optional
-        If True computes a t-Student kernel, by default False
+        If True computes a t-Student kernel, by default False.
     sigma : float, optional
-        The length scale of the Gaussian kernel, by default 1.0
+        The length scale of the Gaussian kernel, by default 1.0.
     p : int, optional
-        p value for the p-norm distance to calculate between each vector pair, by default 2
+        p value for the p-norm distance to calculate between each vector pair, by default 2.
     """
 
     def __init__(self, student=False, sigma=1.0, p=2):
@@ -41,7 +61,7 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
         Parameters
         ----------
         X : torch Tensor of shape (n_samples, n_features)
-            data on which affinity is computed.
+            Data on which affinity is computed.
 
         Returns
         -------
@@ -67,17 +87,17 @@ class EntropicAffinity(BaseAffinity):
         Larger datasets usually require a larger perplexity. Consider selecting a value between 5 and the number of samples. 
         Different values can result in significantly different results. The perplexity must be less than the number of samples.
     tol : _type_, optional
-        Precision threshold at which the root finding algorithm stops, by default 1e-5
+        Precision threshold at which the root finding algorithm stops, by default 1e-5.
     max_iter : int, optional
-        Number of maximum iterations for the root finding algorithm, by default 1000
+        Number of maximum iterations for the root finding algorithm, by default 1000.
     verbose : bool, optional
-        Verbosity, by default True
+        Verbosity, by default True.
     begin : _type_, optional
-        Initial lower bound of the root, by default None
+        Initial lower bound of the root, by default None.
     end : _type_, optional
-        Initial upper bound of the root, by default None
+        Initial upper bound of the root, by default None.
     normalize_as_sne : bool, optional
-        If True the entropic affinity is symmetrized as (Pe + Pe.T) /2, by default True
+        If True the entropic affinity is symmetrized as (Pe + Pe.T) /2, by default True.
 
     References
     ----------
@@ -108,14 +128,13 @@ class EntropicAffinity(BaseAffinity):
         Parameters
         ----------
         X : torch Tensor of shape (n_samples, n_features)
-            data on which affinity is computed.
+            Data on which affinity is computed
 
         Returns
         -------
         log_P: torch Tensor of shape (n_samples, n_samples)
-            Affinity matrix in log space. 
-            If normalize_as_sne is True returns the symmetrized affinty in log space.
-        """ 
+            Affinity matrix in log space. If normalize_as_sne is True returns the symmetrized affinty in log space.
+        """
         C = torch.cdist(X, X, 2)**2
         log_P = self.entropic_affinity(C)
         if self.normalize_as_sne:  # does P+P.T/2 in log space
@@ -127,20 +146,23 @@ class EntropicAffinity(BaseAffinity):
 
     def entropic_affinity(self, C):
         """Performs a binary search to solve the dual problem of entropic affinities in log space.
-        It solves the problem (EA) in [1].
-        Returns the entropic affinity matrix in log space that is **not** symmetric.
+        It solves the problem (EA) in [1] and returns the entropic affinity matrix in log space (which is **not** symmetric).
 
         Parameters
         ----------
         C: torch Tensor of shape (n_samples, n_samples)
             Distance matrix between the samples.
-            
+
         References
         ----------
         [1] SNEkhorn: Dimension Reduction with Symmetric Entropic Affinities, Hugues Van Assel, Titouan Vayer, Rémi Flamary, Nicolas Courty, NeurIPS 2023.
-         """
+        """
         target_entropy = math.log(self.perp) + 1
         n = C.shape[0]
+
+        if not 1 <= self.perp <= n:
+            BadPerplexity(
+                'The perplexity parameter must be between 1 and number of samples')
 
         def f(eps):
             return entropy(log_Pe(C, eps), log=True) - target_entropy
@@ -156,32 +178,47 @@ class SymmetricEntropicAffinity(BaseAffinity):
     def __init__(self,
                  perp,
                  lr=1e-3,
+                 squared_parametrization=True,
                  tol=1e-3,
                  max_iter=10000,
                  optimizer='Adam',
                  verbose=True,
-                 tolog=False,
-                 squared_parametrization=True):
-        """_summary_
+                 tolog=False):
+        """This class computes the solution to the symmetric entropic affinity problem described in [1], in log space. 
+        More precisely, it solves equation (SEA) in [1] with the dual ascent procedure described in the paper and returns the log of the affinity matrix.
 
         Parameters
         ----------
-        perp : _type_
-            _description_
-        lr : _type_, optional
-            _description_, by default 1e-3
-        tol : _type_, optional
-            _description_, by default 1e-3
-        max_iter : int, optional
-            _description_, by default 10000
-        optimizer : str, optional
-            _description_, by default 'Adam'
-        verbose : bool, optional
-            _description_, by default True
-        tolog : bool, optional
-            _description_, by default False
+        perp : int
+            Perplexity parameter, related to the number of nearest neighbors that is used in other manifold learning algorithms. 
+            Larger datasets usually require a larger perplexity. Consider selecting a value between 5 and the number of samples. 
+            Different values can result in significantly different results. The perplexity must be less than the number of samples.
+        lr : float, optional
+            Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-3.
         squared_parametrization : bool, optional
-            _description_, by default True
+            Whether to optimize on the square of the dual variables. If True the algorithm is not convex anymore, but is more stable in practice, by default True
+        tol : float, optional
+            Precision threshold at which the algorithm stops, by default 1e-5.
+        max_iter : int, optional
+            Number of maximum iterations for the algorithm, by default 1000.
+        optimizer : str, optional
+            Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+        verbose : bool, optional
+            Verbosity, by default True.
+        tolog : bool, optional
+            Whether to store intermediate result in a dictionary, by default False.
+
+        Attributes
+        ----------
+        log_ : dictionary
+            Contains the loss and the dual variables at each iteration of the optimization algorithm when tolog = True.
+
+        n_iter_: int
+            Number of iterations run.
+
+        References
+        ----------
+        [1] SNEkhorn: Dimension Reduction with Symmetric Entropic Affinities, Hugues Van Assel, Titouan Vayer, Rémi Flamary, Nicolas Courty, NeurIPS 2023.
         """
         self.perp = perp
         self.lr = lr
@@ -190,61 +227,65 @@ class SymmetricEntropicAffinity(BaseAffinity):
         self.optimizer = optimizer
         self.verbose = verbose
         self.tolog = tolog
-        if tolog:
-            self.log = {}
+        self.n_iter_ = 0
+        self.log_ = {}
         self.squared_parametrization = squared_parametrization
 
     def compute_log_affinity(self, X):
-        """_summary_
+        """Computes the pairwise symmetric entropic affinity matrix in log space.
 
         Parameters
         ----------
-        X : _type_
-            _description_
+        X : torch Tensor of shape (n_samples, n_features)
+            Data on which affinity is computed.
 
         Returns
         -------
-        _type_
-            _description_
+        log_P: torch Tensor of shape (n_samples, n_samples)
+            Affinity matrix in log space. 
         """
         C = torch.cdist(X, X, 2)**2
         log_P = self.symmetric_entropic_affinity(C)
         return log_P
 
     def symmetric_entropic_affinity(self, C):
-        """_summary_
+        """Solves the dual optimization problem (Dual-SEA) in [1] and returns the corresponding symmetric entropic affinty in log space.
 
         Parameters
         ----------
-        C : _type_
-            _description_
+        C : torch Tensor of shape (n_samples, n_samples)
+            Distance matrix between samples.
 
         Returns
         -------
-        _type_
-            _description_
+        log_P: torch Tensor of shape (n_samples, n_samples)
+            Affinity matrix in log space. 
 
-        Raises
-        ------
-        Exception
-            _description_
+        References
+        ----------
+        [1] SNEkhorn: Dimension Reduction with Symmetric Entropic Affinities, Hugues Van Assel, Titouan Vayer, Rémi Flamary, Nicolas Courty, NeurIPS 2023.
         """
         n = C.shape[0]
-        assert 1 <= self.perp <= n
+        if not 1 <= self.perp <= n:
+            BadPerplexity(
+                'The perplexity parameter must be between 1 and number of samples')
         target_entropy = math.log(self.perp) + 1
+        # dual variable corresponding to the entropy constraint
         eps = torch.ones(n, dtype=torch.double)
+        # dual variable corresponding to the marginal constraint
         mu = torch.zeros(n, dtype=torch.double)
         log_P = log_Pse(C, eps, mu, to_square=self.squared_parametrization)
 
         optimizer = OPTIMIZERS[self.optimizer]([eps, mu], lr=self.lr)
 
         if self.tolog:
-            self.log['eps'] = [eps.clone().detach()]
-            self.log['mu'] = [mu.clone().detach()]
-            self.log['loss'] = []
+            self.log_['eps'] = [eps.clone().detach()]
+            self.log_['mu'] = [mu.clone().detach()]
+            self.log_['loss'] = []
 
         if self.verbose:
-            print('---------- Computing the Affinity Matrix ----------')
+            print(
+                '---------- Computing the symmetric entropic affinity Matrix ----------')
 
         one = torch.ones(n, dtype=torch.double)
         pbar = tqdm(range(self.max_iter))
@@ -254,6 +295,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
                 H = entropy(log_P, log=True)
 
                 if self.squared_parametrization:
+                    # the Jacobian must be corrected by 2* diag(eps) in the case of square parametrization.
                     eps.grad = 2*eps.clone().detach()*(H - target_entropy)
                 else:
                     eps.grad = H - target_entropy
@@ -261,18 +303,19 @@ class SymmetricEntropicAffinity(BaseAffinity):
                 P_sum = torch.exp(torch.logsumexp(log_P, -1, keepdim=False))
                 mu.grad = P_sum - one
                 optimizer.step()
-                if not self.squared_parametrization:
+                if not self.squared_parametrization:  # optimize on eps > 0
                     eps.clamp_(min=0)
 
                 log_P = log_Pse(
                     C, eps, mu, to_square=self.squared_parametrization)
 
                 if torch.isnan(eps).any() or torch.isnan(mu).any():
-                    raise Exception(f'NaN in dual variables at iteration {k}')
+                    raise NanError(
+                        f'NaN in dual variables at iteration {k}, consider decreasing the learning rate')
 
                 if self.tolog:
-                    self.log['eps'].append(eps.clone().detach())
-                    self.log['mu'].append(mu.clone().detach())
+                    self.log_['eps'].append(eps.clone().detach())
+                    self.log_['mu'].append(mu.clone().detach())
                     eps_ = eps.clone().detach()
                     if self.squared_parametrization:
                         eps_ = eps_**2
@@ -289,6 +332,8 @@ class SymmetricEntropicAffinity(BaseAffinity):
                         f'marginal std : {float(P_sum.std().item()): .3e}, ')
 
                 if (torch.abs(H - math.log(self.perp)-1) < self.tol).all() and (torch.abs(P_sum - one) < self.tol).all():
+                    self.log_['n_iter'] = k
+                    self.n_iter_ = k
                     if self.verbose:
                         print(f'breaking at iter {k}')
                     break
@@ -306,6 +351,10 @@ class BistochasticAffinity(BaseAffinity):
     ----------
     BaseAffinity : _type_
         _description_
+
+    Attributes
+    ----------
+
     """
 
     def __init__(self,
