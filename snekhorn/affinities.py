@@ -25,12 +25,12 @@ class BaseAffinity():
 
         Parameters
         ----------
-        X : torch Tensor of shape (n_samples, n_features)
+        X : torch.Tensor of shape (n_samples, n_features)
             Data on which affinity is computed.
 
         Returns
         -------
-        P: torch Tensor of shape (n_samples, n_samples)
+        P: torch.Tensor of shape (n_samples, n_samples)
             Affinity matrix.
         """
         log_P = self.compute_log_affinity(X)
@@ -60,12 +60,12 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
 
         Parameters
         ----------
-        X : torch Tensor of shape (n_samples, n_features)
+        X : torch.Tensor of shape (n_samples, n_features)
             Data on which affinity is computed.
 
         Returns
         -------
-        log_P: torch Tensor of shape (n_samples, n_samples)
+        log_P: torch.Tensor of shape (n_samples, n_samples)
             Affinity matrix in log space.
         """
         C = torch.cdist(X, X, self.p)**2
@@ -127,12 +127,12 @@ class EntropicAffinity(BaseAffinity):
 
         Parameters
         ----------
-        X : torch Tensor of shape (n_samples, n_features)
+        X : torch.Tensor of shape (n_samples, n_features)
             Data on which affinity is computed
 
         Returns
         -------
-        log_P: torch Tensor of shape (n_samples, n_samples)
+        log_P: torch.Tensor of shape (n_samples, n_samples)
             Affinity matrix in log space. If normalize_as_sne is True returns the symmetrized affinty in log space.
         """
         C = torch.cdist(X, X, 2)**2
@@ -150,7 +150,7 @@ class EntropicAffinity(BaseAffinity):
 
         Parameters
         ----------
-        C: torch Tensor of shape (n_samples, n_samples)
+        C: torch.Tensor of shape (n_samples, n_samples)
             Distance matrix between the samples.
 
         References
@@ -212,7 +212,6 @@ class SymmetricEntropicAffinity(BaseAffinity):
         ----------
         log_ : dictionary
             Contains the loss and the dual variables at each iteration of the optimization algorithm when tolog = True.
-
         n_iter_: int
             Number of iterations run.
 
@@ -236,12 +235,12 @@ class SymmetricEntropicAffinity(BaseAffinity):
 
         Parameters
         ----------
-        X : torch Tensor of shape (n_samples, n_features)
+        X : torch.Tensor of shape (n_samples, n_features)
             Data on which affinity is computed.
 
         Returns
         -------
-        log_P: torch Tensor of shape (n_samples, n_samples)
+        log_P: torch.Tensor of shape (n_samples, n_samples)
             Affinity matrix in log space. 
         """
         C = torch.cdist(X, X, 2)**2
@@ -253,12 +252,12 @@ class SymmetricEntropicAffinity(BaseAffinity):
 
         Parameters
         ----------
-        C : torch Tensor of shape (n_samples, n_samples)
+        C : torch.Tensor of shape (n_samples, n_samples)
             Distance matrix between samples.
 
         Returns
         -------
-        log_P: torch Tensor of shape (n_samples, n_samples)
+        log_P: torch.Tensor of shape (n_samples, n_samples)
             Affinity matrix in log space. 
 
         References
@@ -285,7 +284,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
 
         if self.verbose:
             print(
-                '---------- Computing the symmetric entropic affinity Matrix ----------')
+                '---------- Computing the symmetric entropic affinity matrix ----------')
 
         one = torch.ones(n, dtype=torch.double)
         pbar = tqdm(range(self.max_iter))
@@ -345,15 +344,33 @@ class SymmetricEntropicAffinity(BaseAffinity):
 
 
 class BistochasticAffinity(BaseAffinity):
-    """_summary_
+    """This class computes the symmetric doubly stochastic affinity matrix in log domain with Sinkhorn algorithm.
+    It normalizes a Gaussian RBF kernel or t-Student kernel to satisfy the doubly stochasticity constraints.
 
     Parameters
     ----------
-    BaseAffinity : _type_
-        _description_
+    eps : float, optional
+        The strength of the regularization for the Sinkhorn algorithm. 
+        It corresponds to the square root of the length scale of the Gaussian kernel when student = False, by default 1.0.
+    f : torch.Tensor of shape (n_samples), optional
+        Initialization for the dual variable of the Sinkhorn algorithm, by default None.
+    tol : float, optional
+        Precision threshold at which the algorithm stops, by default 1e-5.    
+    max_iter : int, optional
+        Number of maximum iterations for the algorithm, by default 100.
+    student : bool, optional
+        Whether to use a t-Student kernel instead of a Gaussian kernel, by default False.
+    verbose : bool, optional
+        Verbosity, by default False.
+    tolog : bool, optional
+        Whether to store intermediate result in a dictionary, by default False.
 
     Attributes
     ----------
+    log_ : dictionary
+        Contains the dual variables at each iteration of the optimization algorithm when tolog = True.
+    n_iter_: int
+        Number of iterations run.
 
     """
 
@@ -361,98 +378,83 @@ class BistochasticAffinity(BaseAffinity):
                  eps=1.0,
                  f=None,
                  tol=1e-5,
-                 max_iter=1000,
+                 max_iter=100,
                  student=False,
+                 verbose=False,
                  tolog=False):
-        """_summary_
-
-        Parameters
-        ----------
-        eps : float, optional
-            _description_, by default 1.0
-        f : _type_, optional
-            _description_, by default None
-        tol : _type_, optional
-            _description_, by default 1e-5
-        max_iter : int, optional
-            _description_, by default 1000
-        student : bool, optional
-            _description_, by default False
-        tolog : bool, optional
-            _description_, by default False
-        """
         self.eps = eps
         self.f = f
         self.tol = tol
         self.max_iter = max_iter
         self.student = student
         self.tolog = tolog
-        if tolog:
-            self.log = {}
+        self.n_iter_ = 0
+        self.verbose = verbose
+        self.log_ = {}
+
 
     def compute_log_affinity(self, X):
-        """_summary_
+        """Computes the doubly stochastic affinity matrix in log space. 
+        Returns the log of the transport plan at convergence.
 
         Parameters
         ----------
-        X : _type_
-            _description_
+        X : torch.Tensor of shape (n_samples, n_features)
+            Data on which affinity is computed.
 
         Returns
         -------
-        _type_
-            _description_
+        log_P: torch.Tensor of shape (n_samples, n_samples)
+            Affinity matrix in log space. 
         """
         C = torch.cdist(X, X, 2)**2
-        # If student is True, considers the Student-t kernel instead of Gaussian
+        # If student is True, considers the Student-t kernel instead of Gaussian RBF
         if self.student:
             C = torch.log(1+C)
         log_P = self.log_selfsink(C)
         return log_P
 
     def log_selfsink(self, C):
-        """ 
-            Performs Sinkhorn iterations in log domain to solve the entropic "self" (or "symmetric") OT problem with symmetric cost C and entropic regularization epsilon.
-            Returns the transport plan and dual variable at convergence.
+        """ Performs Sinkhorn iterations in log domain to solve the entropic "self" (or "symmetric") OT problem with symmetric cost C and entropic regularization eps.
 
-            Parameters
-            ----------
-            C: array (n,n)
-                symmetric distance matrix
-            eps: float
-                entropic regularization coefficient
-            f: array(n)
-                initial dual variable
-            tol: float
-                precision threshold at which the algorithm stops
-            max_iter: int
-                maximum number of Sinkhorn iterations
-            student: bool
-                if True, a Student-t kernel is considered instead of Gaussian
-            tolog: bool
-                if True, log and returns intermediate variables
-        """
+        Parameters
+        ----------
+        C : torch.Tensor of shape (n_samples, n_samples)
+            Distance matrix between samples.
+
+        Returns
+        -------
+        log_P: torch.Tensor of shape (n_samples, n_samples)
+            Affinity matrix in log space. 
+        """        
+
+        if self.verbose:
+            print(
+                '---------- Computing the doubly stochastic affinity matrix ----------')
         n = C.shape[0]
 
         # Allows a warm-start if a dual variable f is provided
         f = torch.zeros(n) if self.f is None else self.f
 
         if self.tolog:
-            self.log['f'] .append(f.clone())
+            self.log_['f'] .append(f.clone())
 
         # Sinkhorn iterations
         for k in range(self.max_iter+1):
             f = 0.5 * (f - self.eps*torch.logsumexp((f - C) / self.eps, -1))
 
             if self.tolog:
-                self.log['f'].append(f.clone())
+                self.log_['f'].append(f.clone())
 
             if torch.isnan(f).any():
-                raise Exception(
+                raise NanError(
                     f'NaN in self-Sinkhorn dual variable at iteration {k}')
 
             log_T = (f[:, None] + f[None, :] - C) / self.eps
             if (torch.abs(torch.exp(torch.logsumexp(log_T, -1))-1) < self.tol).all():
+                self.n_iter_ = k
+                if self.verbose:
+                    print(f'breaking at iter {k}')
                 break
 
             if k == self.max_iter-1:
@@ -461,38 +463,39 @@ class BistochasticAffinity(BaseAffinity):
         return (f[:, None] + f[None, :] - C) / self.eps
 
 
-def log_Pe(C: torch.Tensor,
-           eps: torch.Tensor):
-    """
-        Returns the log of the directed affinity matrix of SNE.
+def log_Pe(C, eps):
+    """Returns the log of the directed affinity matrix of SNE with prescribed kernel bandwidth.
 
-        Parameters
-        ----------
-        C: array (n,n) 
-            distance matrix
-        eps: array (n)
-            kernel bandwidths vector
+    Parameters
+    ----------
+    C : torch.Tensor of shape (n_samples, n_samples)
+        Distance matrix between samples.
+    eps : torch.Tensor of shape (n_samples)
+        Kernel bandwidths vector.
+
+    Returns
+    -------
+    log_P: torch.Tensor of shape (n_samples, n_samples)
+        log of the directed affinity matrix of SNE.
     """
+
     log_P = - C / (eps[:, None])
     return log_P - torch.logsumexp(log_P, -1, keepdim=True)
 
 
-def log_Pse(C: torch.Tensor,
-            eps: torch.Tensor,
-            mu: torch.Tensor,
-            to_square: bool = False):
-    """
-        Returns the log of the symmetric entropic affinity matrix with specified parameters epsilon and mu.
+def log_Pse(C, eps, mu, to_square=False):
+    """Returns the log of the symmetric entropic affinity matrix with specified parameters epsilon and mu.
 
-        Parameters
-        ----------
-        C: array (n,n) 
-            distance matrix
-        eps: array (n)
-            symmetric entropic affinity dual variables associated to the entropy constraint
-        mu: array (n)
-            symmetric entropic affinity dual variables associated to the marginal constraint
-        to_square: TBD
+    Parameters
+    ----------
+    C: torch.Tensor of shape (n_samples, n_samples)
+        Distance matrix between samples.
+    eps: torch.Tensor of shape (n_samples)
+        Symmetric entropic affinity dual variables associated to the entropy constraint.
+    mu: torch.Tensor of shape (n_samples)
+        Symmetric entropic affinity dual variables associated to the marginal constraint.
+    to_square: bool, optional
+        Whether to use the square of the dual variables associated to the entropy constraint, by default False. 
     """
     if to_square:
         return (mu[:, None] + mu[None, :] - 2*C)/(eps[:, None]**2 + eps[None, :]**2)
@@ -500,26 +503,26 @@ def log_Pse(C: torch.Tensor,
         return (mu[:, None] + mu[None, :] - 2*C)/(eps[:, None] + eps[None, :])
 
 
-def Lagrangian(C, log_P, eps, mu, perp=30):
-    """_summary_
+def Lagrangian(C, log_P, eps, mu, perp):
+    """Computes the Lagrangian associated to the symmetric entropic affinity optimization problem.
 
     Parameters
     ----------
-    C : _type_
-        _description_
-    log_P : _type_
-        _description_
-    eps : _type_
-        _description_
-    mu : _type_
-        _description_
-    perp : int, optional
-        _description_, by default 30
+    C: torch.Tensor of shape (n_samples, n_samples)
+        Distance matrix between samples.
+    log_P: torch.Tensor of shape (n_samples, n_samples)
+        log of the symmetric entropic affinity matrix.
+    eps: torch.Tensor of shape (n_samples)
+        Symmetric entropic affinity dual variables associated to the entropy constraint.
+    mu: torch.Tensor of shape (n_samples)
+        Symmetric entropic affinity dual variables associated to the marginal constraint.
+    perp : int
+        Perplexity parameter.
 
     Returns
     -------
-    _type_
-        _description_
+    cost: float
+        Value of the Lagrangian.
     """
     # TBD
     one = torch.ones(C.shape[0], dtype=torch.double)
