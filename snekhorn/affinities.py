@@ -23,7 +23,7 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
     Parameters
     ----------
     student : bool, optional
-        if True computes a t-Student kernel, by default False
+        If True computes a t-Student kernel, by default False
     sigma : float, optional
         The length scale of the Gaussian kernel, by default 1.0
     p : int, optional
@@ -46,7 +46,7 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
         Returns
         -------
         log_P: torch Tensor of shape (n_samples, n_samples)
-            affinity matrix in log space.
+            Affinity matrix in log space.
         """
         C = torch.cdist(X, X, self.p)**2
         if self.student:
@@ -57,12 +57,32 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
 
 
 class EntropicAffinity(BaseAffinity):
-    """_summary_
+    """This class computes the entropic affinity used in SNE and tSNE in log domain. It corresponds also to the Pe matrix in [1] in log domain (see also [2]). 
+    When normalize_as_sne = True, the affinity is symmetrized as (Pe + Pe.T) /2.
 
     Parameters
     ----------
-    BaseAffinity : _type_
-        _description_
+    perp : int
+        Perplexity parameter, related to the number of nearest neighbors that is used in other manifold learning algorithms. 
+        Larger datasets usually require a larger perplexity. Consider selecting a value between 5 and the number of samples. 
+        Different values can result in significantly different results. The perplexity must be less than the number of samples.
+    tol : _type_, optional
+        Precision threshold at which the root finding algorithm stops, by default 1e-5
+    max_iter : int, optional
+        Number of maximum iterations for the root finding algorithm, by default 1000
+    verbose : bool, optional
+        Verbosity, by default True
+    begin : _type_, optional
+        Initial lower bound of the root, by default None
+    end : _type_, optional
+        Initial upper bound of the root, by default None
+    normalize_as_sne : bool, optional
+        If True the entropic affinity is symmetrized as (Pe + Pe.T) /2, by default True
+
+    References
+    ----------
+    [1] SNEkhorn: Dimension Reduction with Symmetric Entropic Affinities, Hugues Van Assel, Titouan Vayer, Rémi Flamary, Nicolas Courty, NeurIPS 2023.
+    [2] Entropic Affinities: Properties and Efficient Numerical Computation, Max Vladymyrov, Miguel A. Carreira-Perpinan, ICML 2013.
     """
 
     def __init__(self,
@@ -73,25 +93,7 @@ class EntropicAffinity(BaseAffinity):
                  begin=None,
                  end=None,
                  normalize_as_sne=True):
-        """_summary_
 
-        Parameters
-        ----------
-        perp : _type_
-            _description_
-        tol : _type_, optional
-            _description_, by default 1e-5
-        max_iter : int, optional
-            _description_, by default 1000
-        verbose : bool, optional
-            _description_, by default True
-        begin : _type_, optional
-            _description_, by default None
-        end : _type_, optional
-            _description_, by default None
-        normalize_as_sne : bool, optional
-            _description_, by default True
-        """
         self.perp = perp
         self.tol = tol
         self.max_iter = max_iter
@@ -101,25 +103,19 @@ class EntropicAffinity(BaseAffinity):
         self.normalize_as_sne = normalize_as_sne
 
     def compute_log_affinity(self, X):
-        """_summary_
+        """Computes the pairwise entropic affinity matrix in log space. If normalize_as_sne is True returns the symmetrized version.
 
         Parameters
         ----------
-        X : _type_
-            _description_
+        X : torch Tensor of shape (n_samples, n_features)
+            data on which affinity is computed.
 
         Returns
         -------
-        _type_
-            _description_
-        """        """_summary_
-
-        Args:
-            X (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
+        log_P: torch Tensor of shape (n_samples, n_samples)
+            Affinity matrix in log space. 
+            If normalize_as_sne is True returns the symmetrized affinty in log space.
+        """ 
         C = torch.cdist(X, X, 2)**2
         log_P = self.entropic_affinity(C)
         if self.normalize_as_sne:  # does P+P.T/2 in log space
@@ -130,22 +126,19 @@ class EntropicAffinity(BaseAffinity):
             return log_P
 
     def entropic_affinity(self, C):
-        """
-            Performs a binary search to solve the dual problem of entropic affinities in log space.
-            Returns the entropic affinity matrix that is **not** symmetrized.
-            Parameters
-            ----------
-            C: array (n, n) 
-                distance matrix
-            perp: int 
-                value of the perplexity parameter
-            tol: float
-                precision threshold at which the algorithm stops
-            max_iter: int
-                maximum iterations for the binary search
-            verbose: bool
-                if True, prints current mean and std entropy values and current bounds 
-        """
+        """Performs a binary search to solve the dual problem of entropic affinities in log space.
+        It solves the problem (EA) in [1].
+        Returns the entropic affinity matrix in log space that is **not** symmetric.
+
+        Parameters
+        ----------
+        C: torch Tensor of shape (n_samples, n_samples)
+            Distance matrix between the samples.
+            
+        References
+        ----------
+        [1] SNEkhorn: Dimension Reduction with Symmetric Entropic Affinities, Hugues Van Assel, Titouan Vayer, Rémi Flamary, Nicolas Courty, NeurIPS 2023.
+         """
         target_entropy = math.log(self.perp) + 1
         n = C.shape[0]
 
