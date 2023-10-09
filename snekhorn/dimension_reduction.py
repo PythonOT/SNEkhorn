@@ -191,7 +191,7 @@ class SNEkhorn(AffinityMatcher):
         Precision threshold at which the algorithm stops, by default 1e-4.
     max_iter : int, optional
         Number of maximum iterations for the descent algorithm, by default 100.
-    learning_rate_sea : float, optional
+    lr_sea : float, optional
         Learning for the computation of the symmetric entropic affinity, by default 1e-1.
     max_iter_sea : int, optional
          Number of maximum iterations for the computation of the symmetric entropic affinity, by default 500.
@@ -237,7 +237,7 @@ class SNEkhorn(AffinityMatcher):
                  lr=1e-1,
                  tol=1e-4,
                  max_iter=100,
-                 learning_rate_sea=1e-1,
+                 lr_sea=1e-1,
                  max_iter_sea=500,
                  tol_sea=1e-3,
                  square_parametrization=True,
@@ -250,7 +250,7 @@ class SNEkhorn(AffinityMatcher):
 
         self.perp = perp
         symmetric_entropic_affinity = SymmetricEntropicAffinity(perp=perp,
-                                                                lr=learning_rate_sea,
+                                                                lr=lr_sea,
                                                                 max_iter=max_iter_sea,
                                                                 tol=tol_sea,
                                                                 tolog=tolog,
@@ -352,12 +352,12 @@ class SimpleSNEkhorn(AffinityMatcher):
     def __init__(self,
                  perp,
                  output_dim=2,
-                 student_kernel=False,  #True for tSNEkhorn
+                 student_kernel=False,
                  optimizer='Adam',
                  lr=1e-1,
                  tol=1e-4,
                  max_iter=100,
-                 learning_rate_sea=1e-1,
+                 lr_sea=1e-1,
                  max_iter_sea=500,
                  tol_sea=1e-3,
                  square_parametrization=True,
@@ -366,7 +366,7 @@ class SimpleSNEkhorn(AffinityMatcher):
 
         self.perp = perp
         symmetric_entropic_affinity = SymmetricEntropicAffinity(perp=perp,
-                                                                lr=learning_rate_sea,
+                                                                lr=lr_sea,
                                                                 max_iter=max_iter_sea,
                                                                 tol=tol_sea,
                                                                 tolog=tolog,
