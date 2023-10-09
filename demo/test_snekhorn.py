@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
 from snekhorn import SNEkhorn
-from snekhorn.affinities import NormalizedGaussianAndStudentAffinity
 from snekhorn.dimension_reduction import SNE
 #%%
 seed=2

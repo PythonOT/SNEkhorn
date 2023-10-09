@@ -78,7 +78,7 @@ class AffinityMatcher():
         if not isinstance(affinity_in_X, BaseAffinity) or not isinstance(affinity_in_X, BaseAffinity):
             raise NotBaseAffinityError(
                 'affinity_in_Z and affinity_in_X must be BaseAffinity and implement a compute_log_affinity method')
-        self.affinity_in_X = affinity_in_X
+        self.affinity_in_X = affinity_in_X # TODO: add a precomputed option
         self.affinity_in_Z = affinity_in_Z  # should be in log space
         self.output_dim = output_dim
         if init not in ['random']:
@@ -122,7 +122,7 @@ class AffinityMatcher():
             Embedding of the training data in low-dimensional space.
         """        
         n = X.shape[0]
-        PX_ = self.affinity_in_X.compute_affinity(X)
+        PX_ = self.affinity_in_X.compute_affinity(X) # TODO: add a precomputed option
         self.PX_ = PX_
         losses = []
         if self.init == "random": #to add different initialization strategies (like PCA)
@@ -199,7 +199,7 @@ class SNEkhorn(AffinityMatcher):
         Precision threshold at which the symmetric entropic affinity algorithm stops, by default 1e-3.
     square_parametrization : bool, optional
         Whether to optimize on the square of the dual variables for calculating the symmetric entropic affinity. 
-        If True the algorithm is not convex anymore but is more stable in practice, by default True.
+        If True the algorithm is not convex anymore but may be more stable in practice, by default False.
     eps : float, optional
         The strength of the regularization for the Sinkhorn algorithm that calculates the doubly stochastic affinity matrix. 
         It corresponds to the square root of the length scale of the Gaussian kernel when student_kernel = False, by default 1.0.
@@ -240,7 +240,7 @@ class SNEkhorn(AffinityMatcher):
                  lr_sea=1e-1,
                  max_iter_sea=500,
                  tol_sea=1e-3,
-                 square_parametrization=True,
+                 square_parametrization=False,
                  eps=1.0,  #Regularization for Sinkhorn
                  init_sinkhorn=None,
                  max_iter_sinkhorn=100,

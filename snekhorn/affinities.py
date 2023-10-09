@@ -183,7 +183,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
     def __init__(self,
                  perp,
                  lr=1e-3,
-                 square_parametrization=True,
+                 square_parametrization=False,
                  tol=1e-3,
                  max_iter=500,
                  optimizer='Adam',
@@ -202,7 +202,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
             Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-3.
         square_parametrization : bool, optional
             Whether to optimize on the square of the dual variables. 
-            If True the algorithm is not convex anymore but is more stable in practice, by default True.
+            If True the algorithm is not convex anymore but may be more stable in practice, by default False.
         tol : float, optional
             Precision threshold at which the algorithm stops, by default 1e-5.
         max_iter : int, optional
@@ -351,7 +351,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
                     break
 
                 if k == self.max_iter-1 and self.verbose:
-                    print('---------- Max iter attained ----------')
+                    print('---------- Warning: max iter attained, algorithm stops but may not have converged ----------')
         
         self.eps_ = eps.clone().detach()
         self.mu_ = mu.clone().detach()
