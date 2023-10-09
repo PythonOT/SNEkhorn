@@ -21,7 +21,7 @@ class BadPerplexity(Exception):
 
 class BaseAffinity():
     def __init__(self):
-        self.log_ = {} #BaseAffinity contains a dictionary of different results 
+        self.log_ = {}  # BaseAffinity contains a dictionary of different results
 
     def compute_affinity(self, X):
         """Computes an affinity matrix from an affinity matrix in log space.
@@ -240,7 +240,6 @@ class SymmetricEntropicAffinity(BaseAffinity):
         self.square_parametrization = square_parametrization
         super(SymmetricEntropicAffinity, self).__init__()
 
-
     def compute_log_affinity(self, X):
         """Computes the pairwise symmetric entropic affinity matrix in log space.
 
@@ -330,10 +329,10 @@ class SymmetricEntropicAffinity(BaseAffinity):
                     self.log_['mu'].append(mu0)
                     if self.square_parametrization:
                         self.log_['loss'].append(-Lagrangian(C, torch.exp(log_P.clone().detach()),
-                                                            eps0**2, mu0, self.perp).item())
+                                                             eps0**2, mu0, self.perp).item())
                     else:
                         self.log_['loss'].append(-Lagrangian(C, torch.exp(log_P.clone().detach()),
-                                                            eps0, mu0, self.perp).item())                        
+                                                             eps0, mu0, self.perp).item())
 
                 perps = torch.exp(H-1)
                 if self.verbose:
@@ -351,8 +350,9 @@ class SymmetricEntropicAffinity(BaseAffinity):
                     break
 
                 if k == self.max_iter-1 and self.verbose:
-                    print('---------- Warning: max iter attained, algorithm stops but may not have converged ----------')
-        
+                    print(
+                        '---------- Warning: max iter attained, algorithm stops but may not have converged ----------')
+
         self.eps_ = eps.clone().detach()
         self.mu_ = mu.clone().detach()
 
@@ -408,8 +408,6 @@ class BistochasticAffinity(BaseAffinity):
         self.verbose = verbose
         super(BistochasticAffinity, self).__init__()
 
-
-
     def compute_log_affinity(self, X):
         """Computes the doubly stochastic affinity matrix in log space. 
         Returns the log of the transport plan at convergence.
@@ -443,7 +441,7 @@ class BistochasticAffinity(BaseAffinity):
         -------
         log_P: torch.Tensor of shape (n_samples, n_samples)
             Affinity matrix in log space. 
-        """        
+        """
 
         if self.verbose:
             print(
@@ -469,13 +467,14 @@ class BistochasticAffinity(BaseAffinity):
 
             log_T = (f[:, None] + f[None, :] - C) / self.eps
             if (torch.abs(torch.exp(torch.logsumexp(log_T, -1))-1) < self.tol).all():
-                self.n_iter_ = k
                 if self.verbose:
                     print(f'breaking at iter {k}')
                 break
 
-            if k == self.max_iter-1:
-                print('---------- Max iter attained ----------')
+            if k == self.max_iter-1 and self.verbose:
+                print('---------- max iter attained for Sinkhorn algorithm ----------')
+
+        self.n_iter_ = k
 
         return (f[:, None] + f[None, :] - C) / self.eps
 
