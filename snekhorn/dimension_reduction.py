@@ -76,7 +76,6 @@ class AffinityMatcher():
         self.max_iter = max_iter
         self.lr = lr
         self.tol = tol
-        self.P_X = None
         if not isinstance(affinity_in_X, BaseAffinity) and not affinity_in_X == "precomputed":
             raise NotBaseAffinityError(
                 'affinity_in_X  must be BaseAffinity or "precomputed".')
