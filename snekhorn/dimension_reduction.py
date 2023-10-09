@@ -3,11 +3,6 @@ from tqdm import tqdm
 from snekhorn.affinities import SymmetricEntropicAffinity, BistochasticAffinity, BaseAffinity, NormalizedGaussianAndStudentAffinity, EntropicAffinity, NanError
 from snekhorn.utils import PCA
 
-
-class NotImplemenedError(Exception):
-    pass
-
-
 class NotBaseAffinityError(Exception):
     pass
 
