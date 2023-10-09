@@ -27,7 +27,7 @@ class AffinityMatcher():
     affinity_in_Z : BaseAffinity
         The affinity in the embedding space that computes Q_Z.
     affinity_in_X : "precomputed" or BaseAffinity
-        The affinity in the embedding space that computes P_X. 
+        The affinity in the input space that computes P_X. 
         If affinity_in_X is "precomputed" then a affinity matrix (instead of a BaseAffinity object) is needed as input for the fit method.
     output_dim : int, optional
         Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
