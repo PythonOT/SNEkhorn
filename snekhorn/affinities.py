@@ -181,9 +181,9 @@ class SymmetricEntropicAffinity(BaseAffinity):
     def __init__(self,
                  perp,
                  lr=1e-3,
-                 squared_parametrization=True,
+                 square_parametrization=True,
                  tol=1e-3,
-                 max_iter=10000,
+                 max_iter=500,
                  optimizer='Adam',
                  verbose=True,
                  tolog=False):
@@ -198,13 +198,13 @@ class SymmetricEntropicAffinity(BaseAffinity):
             Different values can result in significantly different results. The perplexity must be less than the number of samples.
         lr : float, optional
             Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-3.
-        squared_parametrization : bool, optional
+        square_parametrization : bool, optional
             Whether to optimize on the square of the dual variables. 
             If True the algorithm is not convex anymore but is more stable in practice, by default True.
         tol : float, optional
             Precision threshold at which the algorithm stops, by default 1e-5.
         max_iter : int, optional
-            Number of maximum iterations for the algorithm, by default 1000.
+            Number of maximum iterations for the algorithm, by default 500.
         optimizer : str, optional
             Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
         verbose : bool, optional
@@ -218,6 +218,10 @@ class SymmetricEntropicAffinity(BaseAffinity):
             Contains the loss and the dual variables at each iteration of the optimization algorithm when tolog = True.
         n_iter_: int
             Number of iterations run.
+        eps_: torch.Tensor of shape (n_samples)
+            Dual variable associated to the entropy constraint.
+        mu_: torch.Tensor of shape (n_samples)
+            Dual variable associated to the marginal constraint.
 
         References
         ----------
@@ -231,7 +235,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
         self.verbose = verbose
         self.tolog = tolog
         self.n_iter_ = 0
-        self.squared_parametrization = squared_parametrization
+        self.square_parametrization = square_parametrization
 
     def compute_log_affinity(self, X):
         """Computes the pairwise symmetric entropic affinity matrix in log space.
@@ -296,7 +300,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
                 optimizer.zero_grad()
                 H = entropy(log_P, log=True)
 
-                if self.squared_parametrization:
+                if self.square_parametrization:
                     # the Jacobian must be corrected by 2* diag(eps) in the case of square parametrization.
                     eps.grad = 2*eps.clone().detach()*(H - target_entropy)
                 else:
@@ -305,11 +309,11 @@ class SymmetricEntropicAffinity(BaseAffinity):
                 P_sum = torch.exp(torch.logsumexp(log_P, -1, keepdim=False))
                 mu.grad = P_sum - one
                 optimizer.step()
-                if not self.squared_parametrization:  # optimize on eps > 0
+                if not self.square_parametrization:  # optimize on eps > 0
                     eps.clamp_(min=0)
 
                 log_P = log_Pse(
-                    C, eps, mu, to_square=self.squared_parametrization)
+                    C, eps, mu, to_square=self.square_parametrization)
 
                 if torch.isnan(eps).any() or torch.isnan(mu).any():
                     raise NanError(
@@ -319,11 +323,11 @@ class SymmetricEntropicAffinity(BaseAffinity):
                     self.log_['eps'].append(eps.clone().detach())
                     self.log_['mu'].append(mu.clone().detach())
                     eps_ = eps.clone().detach()
-                    if self.squared_parametrization:
+                    if self.square_parametrization:
                         eps_ = eps_**2
                         mu_ = mu.clone().detach()
                         self.log_['loss'].append(-Lagrangian(C, torch.exp(log_P.clone().detach()),
-                                                            eps_, mu_, self.perp, squared_parametrization=self.squared_parametrization).item())
+                                                            eps_, mu_, self.perp, square_parametrization=self.square_parametrization).item())
 
                 perps = torch.exp(H-1)
                 if self.verbose:
@@ -342,6 +346,9 @@ class SymmetricEntropicAffinity(BaseAffinity):
 
                 if k == self.max_iter-1 and self.verbose:
                     print('---------- Max iter attained ----------')
+        
+        self.eps_ = eps_
+        self.mu_ = mu_
 
         return log_P
 
@@ -505,7 +512,7 @@ def log_Pse(C, eps, mu, to_square=False):
         return (mu[:, None] + mu[None, :] - 2*C)/(eps[:, None] + eps[None, :])
 
 
-def Lagrangian(C, log_P, eps, mu, perp):
+def Lagrangian(C, log_P, eps, mu, perp, square_parametrization):
     """Computes the Lagrangian associated to the symmetric entropic affinity optimization problem.
 
     Parameters
@@ -515,9 +522,9 @@ def Lagrangian(C, log_P, eps, mu, perp):
     log_P: torch.Tensor of shape (n_samples, n_samples)
         log of the symmetric entropic affinity matrix.
     eps: torch.Tensor of shape (n_samples)
-        Symmetric entropic affinity dual variables associated to the entropy constraint.
+        Dual variable associated to the entropy constraint.
     mu: torch.Tensor of shape (n_samples)
-        Symmetric entropic affinity dual variables associated to the marginal constraint.
+        Dual variable associated to the marginal constraint.
     perp : int
         Perplexity parameter.
 
@@ -527,6 +534,8 @@ def Lagrangian(C, log_P, eps, mu, perp):
         Value of the Lagrangian.
     """
     one = torch.ones(C.shape[0], dtype=torch.double)
+    if square_parametrization:
+        eps = eps**2
     target_entropy = math.log(perp) + 1
     HP = entropy(log_P, log=True, ax=1)
     return torch.exp(torch.logsumexp(log_P + torch.log(C), (0, 1), keepdim=False)) + torch.inner(eps, (target_entropy - HP)) + torch.inner(mu, (one - torch.exp(torch.logsumexp(log_P, -1, keepdim=False))))

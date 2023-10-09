@@ -1,7 +1,6 @@
 import torch
 from tqdm import tqdm
 from snekhorn.affinities import SymmetricEntropicAffinity, BistochasticAffinity, BaseAffinity, NormalizedGaussianAndStudentAffinity, EntropicAffinity, NanError
-import snekhorn.root_finding as root_finding
 
 
 class NotImplemenedError(Exception):
@@ -30,7 +29,7 @@ class AffinityMatcher():
     affinity_in_X : BaseAffinity
         The affinity in the embedding space that computes P_X.
     output_dim : int, optional
-        Dimension of the embedded space (corresponds to the number of features of Z).
+        Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
     optimizer : str, optional
         Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
     lr : float, optional
@@ -40,11 +39,11 @@ class AffinityMatcher():
     verbose : bool, optional
         Verbosity, by default True.
     tol : float, optional
-        Precision threshold at which the root finding algorithm stops, by default 1e-4.
+        Precision threshold at which the algorithm stops, by default 1e-4.
     max_iter : int, optional
         Number of maximum iterations for the descent algorithm, by default 100.
     tolog : bool, optional
-        Whether to store intermediate result in a dictionary, by default False.
+        Whether to store intermediate results in a dictionary, by default False.
 
     Attributes
     ----------
@@ -54,6 +53,8 @@ class AffinityMatcher():
         Number of iterations run.
     embedding_ : torch.Tensor of shape (n_samples, output_dim)
         Stores the embedding vectors.
+    PX_ :  torch.Tensor of shape (n_samples, n_samples)
+        Fitted affinity matrix in the input space.
     """    
     def __init__(self,
                  affinity_in_Z,  # BaseAffinity objects that computes the affinities in the embedding space Z
@@ -121,8 +122,8 @@ class AffinityMatcher():
             Embedding of the training data in low-dimensional space.
         """        
         n = X.shape[0]
-        P_X = self.affinity_in_X.compute_affinity(X)
-        self.P_X = P_X
+        PX_ = self.affinity_in_X.compute_affinity(X)
+        self.PX_ = PX_
         losses = []
         if self.init == "random": #to add different initialization strategies (like PCA)
             embedding = torch.normal(0, 1, size=(
@@ -137,7 +138,7 @@ class AffinityMatcher():
                 embedding)
 
             # pytorch reverse the standard definition of the KL div and impose that the input is in log space to avoid overflow
-            loss = torch.nn.functional.kl_div(log_Q, P_X, reduction='sum')
+            loss = torch.nn.functional.kl_div(log_Q, PX_, reduction='sum')
             if torch.isnan(loss):
                 raise NanError(f'NaN in loss at iteration {k}, consider decreasing the learning rate')
 
@@ -167,66 +168,85 @@ class AffinityMatcher():
 
 
 class SNEkhorn(AffinityMatcher):
-    """_summary_
+    """This class computes the dimension reduction method presented in [1].  Given a dataset X, it first computes the corresponding symmetric entropic affinity P_X. 
+    In the low-dimensional output space it computes the embedding Z whose doubly stochastic affinity Q_Z is closest to P_X w.r.t. the KL divergence. 
+    It solves min_Z KL(P_X | Q_Z) with first order methods.
 
     Parameters
     ----------
-    AffinityMatcher : _type_
-        _description_
+    perp : int
+        Perplexity parameter for the symmetric entropic affinity P_X. 
+        Larger datasets usually require a larger perplexity. Consider selecting a value between 5 and the number of samples. 
+        Different values can result in significantly different results. The perplexity must be less than the number of samples.
+    output_dim : int, optional
+        Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
+    student_kernel : bool, optional
+        Whether to use a normalized (symmetric + bistochastic) t-Student kernel instead of a Gaussian kernel in Z. 
+        If True it computes tSNEkhorn instead of SNEkhorn (see [1]), by default False.
+    optimizer : str, optional
+        Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+    lr : float, optional
+        Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
+    tol : float, optional
+        Precision threshold at which the algorithm stops, by default 1e-4.
+    max_iter : int, optional
+        Number of maximum iterations for the descent algorithm, by default 100.
+    learning_rate_sea : float, optional
+        Learning for the computation of the symmetric entropic affinity, by default 1e-1.
+    max_iter_sea : int, optional
+         Number of maximum iterations for the computation of the symmetric entropic affinity, by default 500.
+    tol_sea : _type_, optional
+        Precision threshold at which the symmetric entropic affinity algorithm stops, by default 1e-3.
+    square_parametrization : bool, optional
+        Whether to optimize on the square of the dual variables for calculating the symmetric entropic affinity. 
+        If True the algorithm is not convex anymore but is more stable in practice, by default True.
+    eps : float, optional
+        The strength of the regularization for the Sinkhorn algorithm that calculates the doubly stochastic affinity matrix. 
+        It corresponds to the square root of the length scale of the Gaussian kernel when student_kernel = False, by default 1.0.
+    init_sinkhorn : torch.Tensor of shape (n_samples), optional
+        Initialization for the dual variable of the Sinkhorn algorithm, by default None.
+    max_iter_sinkhorn : int, optional
+         Number of maximum iterations for the Sinkhorn algorithm, by default 100.
+    tol_sinkhorn : float, optional
+         Precision threshold at which the Sinkhorn algorithm stops, by default 1e-5.
+    verbose : bool, optional
+        Verbosity, by default True.
+    tolog : bool, optional
+        Whether to store intermediate results in a dictionary, by default False.
+
+    Attributes
+    ----------
+    log_ : dictionary
+        Contains the log of affinity_in_Z, affinity_in_X and the loss at each iteration (if tolog is True).
+    n_iter_: int
+        Number of iterations run.
+    embedding_ : torch.Tensor of shape (n_samples, output_dim)
+        Stores the embedding vectors.
+    PX_ :  torch.Tensor of shape (n_samples, n_samples)
+        Fitted symmetric entropic affinity matrix in the input space.
+
+    References
+    ----------
+    [1] SNEkhorn: Dimension Reduction with Symmetric Entropic Affinities, Hugues Van Assel, Titouan Vayer, Rémi Flamary, Nicolas Courty, NeurIPS 2023.
     """    
     def __init__(self,
                  perp,
                  output_dim=2,
+                 student_kernel=False,  #True for tSNEkhorn
                  optimizer='Adam',
-                 verbose=True,
+                 lr=1e-1,
                  tol=1e-4,
                  max_iter=100,
-                 lr=1e-1,
                  learning_rate_sea=1e-1,
-                 max_iter_sea=1000,
+                 max_iter_sea=500,
                  tol_sea=1e-3,
-                 squared_parametrization=True,
-                 eps=1.0,  # regularization for sinkhorn
+                 square_parametrization=True,
+                 eps=1.0,  #Regularization for Sinkhorn
                  init_sinkhorn=None,
-                 student_kernel=False,  # True for tSNEkhorn
                  max_iter_sinkhorn=100,
                  tol_sinkhorn=1e-5,
+                 verbose=True,
                  tolog=False):
-        """_summary_
-
-        Parameters
-        ----------
-        perp : _type_
-            _description_
-        output_dim : int, optional
-            _description_, by default 2
-        optimizer : str, optional
-            _description_, by default 'Adam'
-        verbose : bool, optional
-            _description_, by default True
-        tol : _type_, optional
-            _description_, by default 1e-4
-        max_iter : int, optional
-            _description_, by default 100
-        lr : _type_, optional
-            _description_, by default 1e-1
-        learning_rate_sea : _type_, optional
-            _description_, by default 1e-1
-        max_iter_sea : int, optional
-            _description_, by default 1000
-        tol_sea : _type_, optional
-            _description_, by default 1e-3
-        squared_parametrization : bool, optional
-            _description_, by default True
-        eps : float, optional
-            _description_, by default 1.0
-        student_kernel : bool, optional
-            _description_, by default False
-        tol_sinkhorn : _type_, optional
-            _description_, by default 1e-5
-        tolog : bool, optional
-            _description_, by default False
-        """        
 
         self.perp = perp
         symmetric_entropic_affinity = SymmetricEntropicAffinity(perp=perp,
@@ -236,7 +256,7 @@ class SNEkhorn(AffinityMatcher):
                                                                 tolog=tolog,
                                                                 optimizer=optimizer,
                                                                 verbose=verbose,
-                                                                squared_parametrization=squared_parametrization)
+                                                                square_parametrization=square_parametrization)
         sinkhorn_affinity = BistochasticAffinity(eps=eps,
                                                  f=init_sinkhorn,
                                                  student=student_kernel,
@@ -256,47 +276,58 @@ class SNEkhorn(AffinityMatcher):
 
 
 class SNE(AffinityMatcher):
-    """_summary_
+    """This class compute the standard SNE/t-SNE algorithm with our own implementation. 
+    Results may differ from those of scikit-learn that implements different initialisation and optimization strategies.
 
     Parameters
     ----------
-    AffinityMatcher : _type_
-        _description_
+    perp : int
+        Perplexity parameter for the entropic affinity P_X. 
+        Larger datasets usually require a larger perplexity. Consider selecting a value between 5 and the number of samples. 
+        Different values can result in significantly different results. The perplexity must be less than the number of samples.
+    output_dim : int, optional
+        Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
+    student_kernel : bool, optional
+        Whether to use a t-Student kernel instead of a Gaussian kernel in Z. 
+        If True it computes tSNE instead of SNE, by default False.
+    optimizer : str, optional
+        Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+    lr : float, optional
+        Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
+    tol : float, optional
+        Precision threshold at which the algorithm stops, by default 1e-4.
+    max_iter : int, optional
+        Number of maximum iterations for the descent algorithm, by default 100.
+    tol_ea : _type_, optional
+        Precision threshold at which the entropic affinity algorithm stops, by default 1e-5.
+    verbose : bool, optional
+        Verbosity, by default True.
+    tolog : bool, optional
+        Whether to store intermediate results in a dictionary, by default False.
+
+    Attributes
+    ----------
+    log_ : dictionary
+        Contains the log of affinity_in_Z, affinity_in_X and the loss at each iteration (if tolog is True).
+    n_iter_: int
+        Number of iterations run.
+    embedding_ : torch.Tensor of shape (n_samples, output_dim)
+        Stores the embedding vectors.
+    PX_ :  torch.Tensor of shape (n_samples, n_samples)
+        Fitted entropic affinity matrix in the input space.
     """    
     def __init__(self,
                  perp,
                  output_dim=2,
+                 student_kernel=False,  #True for tSNE
                  optimizer='Adam',
-                 verbose=True,
+                 lr=1e-1, 
                  tol=1e-4,
                  max_iter=100,
-                 lr=1e-1,
                  tol_ea=1e-5,
-                 student_kernel=False,  # True for tSNE
+                 verbose=True,
                  tolog=False):
-        """_summary_
-
-        Parameters
-        ----------
-        perp : _type_
-            _description_
-        output_dim : int, optional
-            _description_, by default 2
-        optimizer : str, optional
-            _description_, by default 'Adam'
-        verbose : bool, optional
-            _description_, by default True
-        tol : _type_, optional
-            _description_, by default 1e-4
-        max_iter : int, optional
-            _description_, by default 100
-        lr : _type_, optional
-            _description_, by default 1e-1
-        tol_ea : _type_, optional
-            _description_, by default 1e-5
-        student_kernel : bool, optional
-            _description_, by default False
-        """        
+            
         self.perp = perp
         entropic_affinity = EntropicAffinity(perp=perp,
                                              tol=tol_ea,
@@ -306,14 +337,54 @@ class SNE(AffinityMatcher):
             student=student_kernel)
 
         super(SNE, self).__init__(affinity_in_Z=affinity_in_Z,
-                                   affinity_in_X=entropic_affinity,
-                                   output_dim=output_dim,
-                                   optimizer=optimizer,
-                                   verbose=verbose,
-                                   tol=tol,
-                                   max_iter=max_iter,
-                                   lr=lr,
-                                   tolog=tolog)
+                                  affinity_in_X=entropic_affinity,
+                                  output_dim=output_dim,
+                                  optimizer=optimizer,
+                                  verbose=verbose,
+                                  tol=tol,
+                                  max_iter=max_iter,
+                                  lr=lr,
+                                  tolog=tolog)
+        
+
+class SimpleSNEkhorn(AffinityMatcher):
+ 
+    def __init__(self,
+                 perp,
+                 output_dim=2,
+                 student_kernel=False,  #True for tSNEkhorn
+                 optimizer='Adam',
+                 lr=1e-1,
+                 tol=1e-4,
+                 max_iter=100,
+                 learning_rate_sea=1e-1,
+                 max_iter_sea=500,
+                 tol_sea=1e-3,
+                 square_parametrization=True,
+                 verbose=True,
+                 tolog=False):
+
+        self.perp = perp
+        symmetric_entropic_affinity = SymmetricEntropicAffinity(perp=perp,
+                                                                lr=learning_rate_sea,
+                                                                max_iter=max_iter_sea,
+                                                                tol=tol_sea,
+                                                                tolog=tolog,
+                                                                optimizer=optimizer,
+                                                                verbose=verbose,
+                                                                square_parametrization=square_parametrization)
+        affinity_in_Z = NormalizedGaussianAndStudentAffinity(
+            student=student_kernel)
+
+        super(SimpleSNEkhorn, self).__init__(affinity_in_Z=affinity_in_Z,
+                                       affinity_in_X=symmetric_entropic_affinity,
+                                       output_dim=output_dim,
+                                       optimizer=optimizer,
+                                       verbose=verbose,
+                                       tol=tol,
+                                       max_iter=max_iter,
+                                       lr=lr,
+                                       tolog=tolog)
 
 
 # # ---------- Dimension reduction methods related to stochastic neighbor embedding, including ours ----------
