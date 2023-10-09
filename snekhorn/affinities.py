@@ -20,6 +20,9 @@ class BadPerplexity(Exception):
 
 
 class BaseAffinity():
+    def __init__(self):
+        self.log_ = {} #BaseAffinity contains a dictionary of different results 
+
     def compute_affinity(self, X):
         """Computes an affinity matrix from an affinity matrix in log space.
 
@@ -72,7 +75,7 @@ class NormalizedGaussianAndStudentAffinity(BaseAffinity):
         if self.student:
             log_P = - torch.log(1 + C)
         else:
-            log_P = - 1.0 / (2*self.sigma) * C
+            log_P = - C / (2*self.sigma)
         return log_P - torch.logsumexp(log_P, dim=(0, 1))
 
 
@@ -196,7 +199,8 @@ class SymmetricEntropicAffinity(BaseAffinity):
         lr : float, optional
             Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-3.
         squared_parametrization : bool, optional
-            Whether to optimize on the square of the dual variables. If True the algorithm is not convex anymore, but is more stable in practice, by default True
+            Whether to optimize on the square of the dual variables. 
+            If True the algorithm is not convex anymore but is more stable in practice, by default True.
         tol : float, optional
             Precision threshold at which the algorithm stops, by default 1e-5.
         max_iter : int, optional
@@ -227,7 +231,6 @@ class SymmetricEntropicAffinity(BaseAffinity):
         self.verbose = verbose
         self.tolog = tolog
         self.n_iter_ = 0
-        self.log_ = {}
         self.squared_parametrization = squared_parametrization
 
     def compute_log_affinity(self, X):
@@ -310,7 +313,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
 
                 if torch.isnan(eps).any() or torch.isnan(mu).any():
                     raise NanError(
-                        f'NaN in dual variables at iteration {k}, consider decreasing the learning rate')
+                        f'NaN in dual variables at iteration {k}, consider decreasing the learning rate of SymmetricEntropicAffinity')
 
                 if self.tolog:
                     self.log_['eps'].append(eps.clone().detach())
@@ -319,7 +322,7 @@ class SymmetricEntropicAffinity(BaseAffinity):
                     if self.squared_parametrization:
                         eps_ = eps_**2
                         mu_ = mu.clone().detach()
-                        self.log['loss'].append(-Lagrangian(C, torch.exp(log_P.clone().detach()),
+                        self.log_['loss'].append(-Lagrangian(C, torch.exp(log_P.clone().detach()),
                                                             eps_, mu_, self.perp, squared_parametrization=self.squared_parametrization).item())
 
                 perps = torch.exp(H-1)
@@ -390,7 +393,6 @@ class BistochasticAffinity(BaseAffinity):
         self.tolog = tolog
         self.n_iter_ = 0
         self.verbose = verbose
-        self.log_ = {}
 
 
     def compute_log_affinity(self, X):
@@ -415,7 +417,7 @@ class BistochasticAffinity(BaseAffinity):
         return log_P
 
     def log_selfsink(self, C):
-        """ Performs Sinkhorn iterations in log domain to solve the entropic "self" (or "symmetric") OT problem with symmetric cost C and entropic regularization eps.
+        """Performs Sinkhorn iterations in log domain to solve the entropic "self" (or "symmetric") OT problem with symmetric cost C and entropic regularization eps.
 
         Parameters
         ----------
@@ -524,7 +526,6 @@ def Lagrangian(C, log_P, eps, mu, perp):
     cost: float
         Value of the Lagrangian.
     """
-    # TBD
     one = torch.ones(C.shape[0], dtype=torch.double)
     target_entropy = math.log(perp) + 1
     HP = entropy(log_P, log=True, ax=1)
