@@ -244,7 +244,7 @@ class SNEkhorn(AffinityMatcher):
     Attributes
     ----------
     log_ : dictionary
-        Contains the log of affinity_in_Z, affinity_in_X and the loss at each iteration (if tolog is True).
+        Contains the log of affinity_embedding, affinity_data and the loss at each iteration (if tolog is True).
     n_iter_: int
         Number of iterations run.
     embedding_ : torch.Tensor of shape (n_samples, output_dim)
@@ -342,7 +342,7 @@ class SNE(AffinityMatcher):
     Attributes
     ----------
     log_ : dictionary
-        Contains the log of affinity_in_Z, affinity_in_X and the loss at each iteration (if tolog is True).
+        Contains the log of affinity_embedding, affinity_data and the loss at each iteration (if tolog is True).
     n_iter_: int
         Number of iterations run.
     embedding_ : torch.Tensor of shape (n_samples, output_dim)
@@ -434,7 +434,7 @@ class DRWrapper(AffinityMatcher):
     Attributes
     ----------
     log_ : dictionary
-        Contains the log of affinity_in_Z, affinity_in_X and the loss at each iteration (if tolog is True).
+        Contains the log of affinity_embedding, affinity_data and the loss at each iteration (if tolog is True).
     n_iter_: int
         Number of iterations run.
     embedding_ : torch.Tensor of shape (n_samples, output_dim)
