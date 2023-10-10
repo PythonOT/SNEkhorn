@@ -1,6 +1,6 @@
 # %% Very simple script to take in charge the framework
 from snekhorn.affinities import BistochasticAffinity, SymmetricEntropicAffinity
-from snekhorn.dimension_reduction import AffinityMatcher
+from snekhorn.dimension_reduction import AffinityMatcher, DRWrapper
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,14 +38,30 @@ symmetric_entropic_affinity = SymmetricEntropicAffinity(
 PX = symmetric_entropic_affinity.compute_affinity(X)
 # %% Match the fixed affinity PX with a bistochastic kernel
 bisto_affinity = BistochasticAffinity()
-snekhorn_precomputed = AffinityMatcher(affinity_in_Z=bisto_affinity,
-                                       affinity_in_X="precomputed",
+snekhorn_precomputed = AffinityMatcher(affinity_embedding=bisto_affinity,
+                                       affinity_data="precomputed",
                                        lr=1e-1)
 # the fit method when precomputed should be applied on a affinity matrix
 snekhorn_precomputed.fit(PX)
-#%% 
+# %%
 Zsnekhorn = snekhorn_precomputed.embedding_
 plt.scatter(X[:, 0], X[:, 1], label='data')
 plt.scatter(Zsnekhorn[:, 0], Zsnekhorn[:, 1], label='tsnekhorn embedding')
+plt.legend()
+# %% The DRWrapper can also be used to quickly change from one affinity to the other
+params_affinity_data = {'lr': 0.1, 'max_iter': 500,  # if not provided then default parameters
+                        'square_parametrization': True}
+params_affinity_embedding = {'eps': 0.1, 'max_iter': 100}
+
+general_dr = DRWrapper(perp=5,
+                       affinity_data='symmetric_entropic_affinity',
+                       affinity_embedding='gaussian_bistochastic',
+                       params_affinity_data=params_affinity_data,
+                       params_affinity_embedding=params_affinity_embedding)
+general_dr.fit(X)
+# %%
+plt.scatter(X[:, 0], X[:, 1], label='data')
+plt.scatter(general_dr.embedding_[:, 0], general_dr.embedding_[
+            :, 1], label='embedding')
 plt.legend()
 # %%

@@ -3,11 +3,16 @@ from tqdm import tqdm
 from snekhorn.affinities import SymmetricEntropicAffinity, BistochasticAffinity, BaseAffinity, NormalizedGaussianAndStudentAffinity, EntropicAffinity, NanError
 from snekhorn.utils import PCA
 
+
 class NotBaseAffinityError(Exception):
     pass
 
 
 class WrongInputFitError(Exception):
+    pass
+
+
+class WrongParameter(Exception):
     pass
 
 
@@ -24,11 +29,11 @@ class AffinityMatcher():
 
     Parameters
     ----------
-    affinity_in_Z : BaseAffinity
-        The affinity in the embedding space that computes Q_Z.
-    affinity_in_X : "precomputed" or BaseAffinity
-        The affinity in the input space that computes P_X. 
-        If affinity_in_X is "precomputed" then a affinity matrix (instead of a BaseAffinity object) is needed as input for the fit method.
+    affinity_embedding : BaseAffinity
+        The affinity in the embedding space (in Z, corresponds to Q_Z).
+    affinity_data : "precomputed" or BaseAffinity
+        The affinity in the input space (in X, corresponds to P_X). 
+        If affinity_data is "precomputed" then a affinity matrix (instead of a BaseAffinity object) is needed as input for the fit method.
     output_dim : int, optional
         Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
     optimizer : str, optional
@@ -49,7 +54,7 @@ class AffinityMatcher():
     Attributes
     ----------
     log_ : dictionary
-        When tolog=True it contains the log of affinity_in_Z, affinity_in_X (if affinity_in_X is not precomputed) and the loss at each iteration.
+        When tolog=True it contains the log of affinity_embedding, affinity_data (if affinity_data is not precomputed) and the loss at each iteration.
     n_iter_: int
         Number of iterations run.
     embedding_ : torch.Tensor of shape (n_samples, output_dim)
@@ -59,8 +64,8 @@ class AffinityMatcher():
     """
 
     def __init__(self,
-                 affinity_in_Z,
-                 affinity_in_X,
+                 affinity_embedding,
+                 affinity_data,
                  output_dim=2,
                  optimizer='Adam',
                  lr=1e-1,
@@ -76,14 +81,14 @@ class AffinityMatcher():
         self.max_iter = max_iter
         self.lr = lr
         self.tol = tol
-        if not isinstance(affinity_in_X, BaseAffinity) and not affinity_in_X == "precomputed":
+        if not isinstance(affinity_data, BaseAffinity) and not affinity_data == "precomputed":
             raise NotBaseAffinityError(
-                'affinity_in_X  must be BaseAffinity or "precomputed".')
-        if not isinstance(affinity_in_Z, BaseAffinity):
+                'affinity_data  must be BaseAffinity or "precomputed".')
+        if not isinstance(affinity_embedding, BaseAffinity):
             raise NotBaseAffinityError(
-                'affinity_in_Z  must be BaseAffinity and implement a compute_log_affinity method.')
-        self.affinity_in_X = affinity_in_X
-        self.affinity_in_Z = affinity_in_Z
+                'affinity_embedding must be BaseAffinity and implement a compute_log_affinity method.')
+        self.affinity_data = affinity_data
+        self.affinity_embedding = affinity_embedding
         self.output_dim = output_dim
         if init not in ['random', 'pca']:
             raise NotImplementedError(
@@ -98,7 +103,7 @@ class AffinityMatcher():
         Parameters
         ----------
         X : torch.Tensor of shape (n_samples, n_features) or torch.Tensor of shape (n_samples, n_samples)
-            Data to embed or affinity matrix between samples if affinity_in_X="precomputed".
+            Data to embed or affinity matrix between samples if affinity_data="precomputed".
         y : None
             Ignored.
 
@@ -111,12 +116,12 @@ class AffinityMatcher():
         return self
 
     def fit_transform(self, X, y=None):
-        """_summary_
+        """Fit X into an embedded space and returns the embedding.
 
         Parameters
         ----------
         X : torch.Tensor of shape (n_samples, n_features) or torch.Tensor of shape (n_samples, n_samples)
-            Data to embed or affinity matrix between samples if affinity_in_X="precomputed".
+            Data to embed or affinity matrix between samples if affinity_embedding="precomputed".
         y : None
             Ignored.
 
@@ -126,15 +131,15 @@ class AffinityMatcher():
             Embedding of the training data in low-dimensional space.
         """
         n = X.shape[0]
-        if isinstance(self.affinity_in_X, BaseAffinity):
-            PX_ = self.affinity_in_X.compute_affinity(X)
+        if isinstance(self.affinity_data, BaseAffinity):
+            PX_ = self.affinity_data.compute_affinity(X)
         else:
             if X.shape[1] != n:
                 raise WrongInputFitError(
-                    'When affinity_in_X="precomputed" the input X in fit must be a torch.Tensor of shape (n_samples, n_samples)')
+                    'When affinity_data="precomputed" the input X in fit must be a torch.Tensor of shape (n_samples, n_samples)')
             if not torch.all(X >= 0):  # a bit quick and dirty
                 raise WrongInputFitError(
-                    'When affinity_in_X="precomputed" the input X in fit must be non-negative')
+                    'When affinity_data="precomputed" the input X in fit must be non-negative')
             PX_ = X
 
         self.PX_ = PX_
@@ -152,7 +157,7 @@ class AffinityMatcher():
         pbar = tqdm(range(self.max_iter))
         for k in pbar:
             optimizer.zero_grad()
-            log_Q = self.affinity_in_Z.compute_log_affinity(
+            log_Q = self.affinity_embedding.compute_log_affinity(
                 embedding)
 
             # pytorch reverse the standard definition of the KL div and impose that the input is in log space to avoid overflow
@@ -180,9 +185,9 @@ class AffinityMatcher():
         self.n_iter_ = k
         if self.tolog:
             self.log_['loss'] = losses
-            if isinstance(self.affinity_in_X, BaseAffinity):
-                self.log_['log_affinity_in_X'] = self.affinity_in_X.log_
-            self.log_['log_affinity_in_Z'] = self.affinity_in_Z.log_
+            if isinstance(self.affinity_data, BaseAffinity):
+                self.log_['log_affinity_data'] = self.affinity_data.log_
+            self.log_['log_affinity_embedding'] = self.affinity_embedding.log_
             self.log_['embedding'] = self.embedding_
         return self.embedding_
 
@@ -289,8 +294,8 @@ class SNEkhorn(AffinityMatcher):
                                                  max_iter=max_iter_sinkhorn,
                                                  verbose=False)
 
-        super(SNEkhorn, self).__init__(affinity_in_Z=sinkhorn_affinity,
-                                       affinity_in_X=symmetric_entropic_affinity,
+        super(SNEkhorn, self).__init__(affinity_embedding=sinkhorn_affinity,
+                                       affinity_data=symmetric_entropic_affinity,
                                        output_dim=output_dim,
                                        optimizer=optimizer,
                                        verbose=verbose,
@@ -364,11 +369,11 @@ class SNE(AffinityMatcher):
                                              tol=tol_ea,
                                              verbose=verbose,
                                              normalize_as_sne=True)
-        affinity_in_Z = NormalizedGaussianAndStudentAffinity(
+        affinity_embedding = NormalizedGaussianAndStudentAffinity(
             student=student_kernel)
 
-        super(SNE, self).__init__(affinity_in_Z=affinity_in_Z,
-                                  affinity_in_X=entropic_affinity,
+        super(SNE, self).__init__(affinity_embedding=affinity_embedding,
+                                  affinity_data=entropic_affinity,
                                   output_dim=output_dim,
                                   optimizer=optimizer,
                                   verbose=verbose,
@@ -377,3 +382,153 @@ class SNE(AffinityMatcher):
                                   lr=lr,
                                   init=init,
                                   tolog=tolog)
+
+
+class DRWrapper(AffinityMatcher):
+    """Wrapper for all the dimension reduction methods. You can choose the dimension reduction method directly with the parameter affinity_data and affinity_embedding.
+
+    Parameters
+    ----------
+    perp : int, optional
+        Perplexity parameter for the entropic or symmetric entropic affinity. 
+        Larger datasets usually require a larger perplexity. Consider selecting a value between 5 and the number of samples. 
+        Different values can result in significantly different results. The perplexity must be less than the number of samples.
+        Ignored if affinity_data is not "entropic_affinity" or "symmetric_entropic_affinity", by default None.
+    affinity_data : str, optional
+         Which affinity to use on the data among ['precomputed', 'gaussian', 'gaussian_bistochastic', 'entropic_affinity', 'symmetric_entropic_affinity'].
+         affinity_data = 'gaussian' corresponds to a NormalizedGaussianAndStudentAffinity(student=False) BaseAffinity.
+         affinity_data = 'gaussian_bistochastic' corresponds to a BistochasticAffinity(student=False) BaseAffinity.
+         affinity_data = 'entropic_affinity' corresponds to a EntropicAffinity() BaseAffinity.
+         affinity_data = 'symmetric_entropic_affinity' corresponds to a SymmetricEntropicAffinity() BaseAffinity.
+         If 'entropic_affinity' or 'symmetric_entropic_affinity' the perplexity parameter must be defined, by default 'gaussian'.
+    affinity_embedding : str, optional
+        Which affinity to use on the embedding among ['gaussian', 'student', 'gaussian_bistochastic', 'student_bistochastic']
+        affinity_embedding = 'gaussian' corresponds to a NormalizedGaussianAndStudentAffinity(student=False) BaseAffinity.
+        affinity_embedding = 'student' corresponds to a NormalizedGaussianAndStudentAffinity(student=True) BaseAffinity.
+        affinity_embedding = 'gaussian_bistochastic' corresponds to a BistochasticAffinity(student=False) BaseAffinity.
+        affinity_embedding = 'student_bistochastic' corresponds to a BistochasticAffinity(student=True) BaseAffinity.
+        By default 'student'.
+    params_affinity_data : dict, optional
+        Contains the different parameters for computing the affinity on the data, see corresponding BaseAffinity class. 
+        If not provided default parameters, by default {}.
+    params_affinity_embedding : dict, optional
+        Contains the different parameters for computing the affinity on the embedding, see corresponding BaseAffinity class. 
+        If not provided default parameters, by default {}.
+    output_dim : int, optional
+        Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
+    optimizer : str, optional
+        _description_, by default 'Adam'
+    optimizer : str, optional
+        Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+    lr : float, optional
+        Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
+    init : str, optional
+        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
+    tol : float, optional
+        Precision threshold at which the algorithm stops, by default 1e-4.
+    max_iter : int, optional
+        Number of maximum iterations for the descent algorithm, by default 100.
+    tolog : bool, optional
+        Whether to store intermediate results in a dictionary, by default False.
+
+    Attributes
+    ----------
+    log_ : dictionary
+        Contains the log of affinity_in_Z, affinity_in_X and the loss at each iteration (if tolog is True).
+    n_iter_: int
+        Number of iterations run.
+    embedding_ : torch.Tensor of shape (n_samples, output_dim)
+        Stores the embedding vectors.
+    PX_ :  torch.Tensor of shape (n_samples, n_samples)
+        Fitted symmetric entropic affinity matrix in the input space.
+    """
+
+    def __init__(self,
+                 perp=None,
+                 affinity_data='gaussian',
+                 affinity_embedding='student',
+                 params_affinity_data={},
+                 params_affinity_embedding={},
+                 output_dim=2,
+                 optimizer='Adam',
+                 lr=1e-1,
+                 init='pca',
+                 verbose=True,
+                 tol=1e-4,
+                 max_iter=100,
+                 tolog=False):
+
+        self.perp = perp
+        possible_data_affinities = [
+            'precomputed', 'gaussian', 'gaussian_bistochastic', 'entropic_affinity', 'symmetric_entropic_affinity']
+        possible_embedding_affinities = [
+            'gaussian', 'student', 'gaussian_bistochastic', 'student_bistochastic']
+
+        if affinity_data not in possible_data_affinities:
+            raise WrongParameter(
+                'affinity_data must be in {}'.format(possible_data_affinities))
+
+        if affinity_embedding not in possible_embedding_affinities:
+            raise WrongParameter('affinity_embedding must be in {}'.format(
+                possible_embedding_affinities))
+
+        if self.perp is None and affinity_data in ['entropic_affinity', 'symmetric_entropic_affinity']:
+            raise WrongParameter(
+                'When affinity_data is entropic_affinity or symmetric_entropic_affinity you must define the perplexity parameter perp.')
+
+        # How to compute the affinity of the data
+        if affinity_data == 'precomputed':
+            affinity_in_X = 'precomputed'
+
+        elif affinity_data == 'gaussian':
+            affinity_in_X = NormalizedGaussianAndStudentAffinity(student=False)
+
+        elif affinity_data == 'gaussian_bistochastic':
+            if 'student' in params_affinity_data.keys() and params_affinity_data['student'] == True:
+                raise WrongParameter(
+                    'You have chosen a bistochastic RBF kernel (affinity_data == "gaussian_bistochastic") but params_affinity_data[student] = True; so both disagree.')
+
+            affinity_in_X = BistochasticAffinity(
+                student=False, tolog=tolog, **params_affinity_data)
+
+        elif affinity_data == 'entropic_affinity':
+            affinity_in_X = EntropicAffinity(
+                perp=self.perp, verbose=verbose, **params_affinity_data)
+
+        elif affinity_data == 'symmetric_entropic_affinity':
+            affinity_in_X = SymmetricEntropicAffinity(
+                perp=self.perp, tolog=tolog, verbose=verbose, **params_affinity_data)
+
+        # How to compute the affinity of the embedding
+        if affinity_embedding == 'gaussian':
+            affinity_in_Z = NormalizedGaussianAndStudentAffinity(student=False)
+
+        elif affinity_embedding == 'student':
+            affinity_in_Z = NormalizedGaussianAndStudentAffinity(student=True)
+
+        elif affinity_embedding == 'gaussian_bistochastic':
+            if 'student' in params_affinity_embedding.keys() and params_affinity_embedding['student'] == True:
+                raise WrongParameter(
+                    'You have chosen a bistochastic RBF kernel (affinity_embedding == "gaussian_bistochastic") but params_affinity_embedding[student] = True; so both disagree.')
+
+            affinity_in_Z = BistochasticAffinity(
+                student=False, tolog=tolog, verbose=False, **params_affinity_embedding)
+
+        elif affinity_embedding == 'student_bistochastic':
+            if 'student' in params_affinity_embedding.keys() and params_affinity_embedding['student'] == False:
+                raise WrongParameter(
+                    'You have chosen a bistochastic student kernel (affinity_embedding == "student_bistochastic") but params_affinity_embedding[student] = False; so both disagree.')
+
+            affinity_in_Z = BistochasticAffinity(
+                student=True, tolog=tolog, verbose=False, **params_affinity_embedding)
+
+        super(DRWrapper, self).__init__(affinity_embedding=affinity_in_Z,
+                                        affinity_data=affinity_in_X,
+                                        output_dim=output_dim,
+                                        optimizer=optimizer,
+                                        verbose=verbose,
+                                        tol=tol,
+                                        max_iter=max_iter,
+                                        lr=lr,
+                                        init=init,
+                                        tolog=tolog)

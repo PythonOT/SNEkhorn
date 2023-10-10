@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import ot
 from matplotlib import cm
 import numpy as np
-from snekhorn.affinities import SymmetricEntropicAffinity, EntropicAffinity, BistochasticAffinity, BaseAffinity
+from snekhorn.affinities import SymmetricEntropicAffinity, EntropicAffinity, BistochasticAffinity
 #%%
 seed=2
 torch.manual_seed(seed)
