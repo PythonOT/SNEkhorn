@@ -385,7 +385,7 @@ class SNE(AffinityMatcher):
 
 
 class DRWrapper(AffinityMatcher):
-    """Wrapper for all the dimension reduction methods. You can choose the dimension reduction method directly with the parameter affinity_data and affinity_embedding.
+    """Wrapper for all the dimension reduction methods. You can choose the dimension reduction method directly by selecting the parameters affinity_data and affinity_embedding.
 
     Parameters
     ----------
