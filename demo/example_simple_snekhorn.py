@@ -49,7 +49,7 @@ plt.scatter(X[:, 0], X[:, 1], label='data')
 plt.scatter(Zsnekhorn[:, 0], Zsnekhorn[:, 1], label='tsnekhorn embedding')
 plt.legend()
 # %% The DRWrapper can also be used to quickly change from one affinity to the other
-params_affinity_data = {'lr': 0.1, 'max_iter': 500,  # if not provided then default parameters
+params_affinity_data = {'lr': 0.1, 'max_iter': 500,  # if not provided default parameters
                         'square_parametrization': True}
 params_affinity_embedding = {'eps': 0.1, 'max_iter': 100}
 
