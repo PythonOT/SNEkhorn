@@ -90,15 +90,16 @@ for name_score, dic_score in zip(['Silhouette', 'Trustworthiness'],
                                  [silhouette_scores, trustworthiness_scores]):
     for i, name in enumerate(['Simple tSNEkhorn', 'tSNEkhorn', 'tSNE (sklearn)']):
         ax[j].plot(perps_test, dic_score[name],
-                   marker='o', c=cmap(i), lw=2, label=name)
+                   marker='o', c=cmap(i), lw=3, label=name)
     ax[j].legend(fontsize=fs-2)
     ax[j].grid()
+    ax[j].tick_params(axis='both', which='major', labelsize=13)
     ax[j].set_xscale('log')
     ax[j].set_xlabel('Perplexity', fontsize=fs)
     ax[j].set_ylabel('{} score'.format(name_score), fontsize=fs)
     j += 1
-plt.title(
+plt.suptitle(
     'Silhouette/ Trustworthiness scores on COIL', fontsize=fs)
 plt.tight_layout()
-
+plt.savefig('../data/saved/coil_expe.pdf')
 # %%
