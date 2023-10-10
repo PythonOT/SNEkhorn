@@ -55,7 +55,7 @@ simpletsnekhorn = DRWrapper(affinity_data='precomputed',
                             lr=lr,
                             max_iter=max_iter)
 res = {}
-for model, name in zip([None], ['tSNEkhorn', 'Simple tSNEkhorn', 'tSNE (sklearn)']):
+for model, name in zip([tsnekhorn, simpletsnekhorn, None], ['tSNEkhorn', 'Simple tSNEkhorn', 'tSNE (sklearn)']):
     for i, perp in enumerate(perps_test):
         if name == 'tSNE (sklearn)':
             tsne_sklearn = TSNE(perplexity=perp)
