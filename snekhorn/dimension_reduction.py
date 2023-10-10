@@ -320,7 +320,7 @@ class SNE(AffinityMatcher):
     output_dim : int, optional
         Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
     student_kernel : bool, optional
-        Whether to use a t-Student kernel instead of a Gaussian kernel in Z. 
+        Whether to use a t-Student kernel instead of a Gaussian kernel in the embedding space. 
         If True it computes tSNE instead of SNE, by default False.
     optimizer : str, optional
         Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
@@ -334,6 +334,8 @@ class SNE(AffinityMatcher):
         Number of maximum iterations for the descent algorithm, by default 100.
     tol_ea : _type_, optional
         Precision threshold at which the entropic affinity algorithm stops, by default 1e-5.
+    max_iter_ea : int, optional
+        Number of maximum iterations for finding the entropic affinity, by default 1000.
     verbose : bool, optional
         Verbosity, by default True.
     tolog : bool, optional
@@ -361,6 +363,7 @@ class SNE(AffinityMatcher):
                  tol=1e-4,
                  max_iter=100,
                  tol_ea=1e-5,
+                 max_iter_ea=1000,
                  verbose=True,
                  tolog=False):
 
@@ -368,6 +371,7 @@ class SNE(AffinityMatcher):
         entropic_affinity = EntropicAffinity(perp=perp,
                                              tol=tol_ea,
                                              verbose=verbose,
+                                             max_iter=max_iter_ea,
                                              normalize_as_sne=True)
         affinity_embedding = NormalizedGaussianAndStudentAffinity(
             student=student_kernel)
