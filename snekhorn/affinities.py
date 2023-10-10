@@ -191,7 +191,8 @@ class SymmetricEntropicAffinity(BaseAffinity):
                  tolog=False):
         """This class computes the solution to the symmetric entropic affinity problem described in [1], in log space. 
         More precisely, it solves equation (SEA) in [1] with the dual ascent procedure described in the paper and returns the log of the affinity matrix.
-
+        When square_parametrization=False, the problem is convex.
+        
         Parameters
         ----------
         perp : int
