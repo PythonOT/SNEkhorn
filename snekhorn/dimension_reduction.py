@@ -39,7 +39,7 @@ class AffinityMatcher():
     optimizer : str, optional
         Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
     lr : float, optional
-        Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
+        Learning rate for the algorithm, by default 1.0.
     init : str, optional
         Initialization of embedding Z among ['random', 'pca'], default 'pca'.
     verbose : bool, optional
@@ -68,7 +68,7 @@ class AffinityMatcher():
                  affinity_data,
                  output_dim=2,
                  optimizer='Adam',
-                 lr=1e-1,
+                 lr=1.0,
                  init='pca',
                  verbose=True,
                  tol=1e-4,
@@ -211,7 +211,7 @@ class SNEkhorn(AffinityMatcher):
     optimizer : str, optional
         Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
     lr : float, optional
-        Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
+        Learning rate for the algorithm, by default 1.0.
     init : str, optional
         Initialization of embedding Z among ['random', 'pca'], default 'pca'.
     tol : float, optional
@@ -262,7 +262,7 @@ class SNEkhorn(AffinityMatcher):
                  output_dim=2,
                  student_kernel=False,  # True for tSNEkhorn
                  optimizer='Adam',
-                 lr=1e-1,
+                 lr=1.0,
                  init='pca',
                  tol=1e-4,
                  max_iter=100,
@@ -325,7 +325,7 @@ class SNE(AffinityMatcher):
     optimizer : str, optional
         Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
     lr : float, optional
-        Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
+        Learning rate for the algorithm, by default 1.0.
     init : str, optional
         Initialization of embedding Z among ['random', 'pca'], default 'pca'.
     tol : float, optional
@@ -358,7 +358,7 @@ class SNE(AffinityMatcher):
                  output_dim=2,
                  student_kernel=False,  # True for tSNE
                  optimizer='Adam',
-                 lr=1e-1,
+                 lr=1.0,
                  init='pca',
                  tol=1e-4,
                  max_iter=100,
@@ -425,7 +425,7 @@ class DRWrapper(AffinityMatcher):
     optimizer : str, optional
         Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
     lr : float, optional
-        Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
+        Learning rate for the algorithm, by default 1.0.
     init : str, optional
         Initialization of embedding Z among ['random', 'pca'], default 'pca'.
     tol : float, optional
@@ -455,7 +455,7 @@ class DRWrapper(AffinityMatcher):
                  params_affinity_embedding={},
                  output_dim=2,
                  optimizer='Adam',
-                 lr=1e-1,
+                 lr=1.0,
                  init='pca',
                  verbose=True,
                  tol=1e-4,

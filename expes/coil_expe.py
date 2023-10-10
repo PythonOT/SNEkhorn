@@ -35,8 +35,8 @@ for i, perp in enumerate(perps_test):
     all_affinities[perp] = PX
     print('Perp = {} done'.format(perp))
 # %% Save the affinities
-with open('../data/saved/symmetric_entropic_affinities_COIL.pkl', 'wb') as f:
-    pickle.dump(all_affinities, f)
+# with open('../data/saved/symmetric_entropic_affinities_COIL.pkl', 'wb') as f:
+#     pickle.dump(all_affinities, f)
 # %%
 lr = 1.0 # learning rate for all methods, tune it for better results
 max_iter = 1500
