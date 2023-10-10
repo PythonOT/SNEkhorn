@@ -36,7 +36,7 @@ class AffinityMatcher():
     lr : float, optional
         Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
     init : str, optional
-        Initialization of embedding Z among ['random', 'pca'], default 'random'.
+        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
     verbose : bool, optional
         Verbosity, by default True.
     tol : float, optional
@@ -64,7 +64,7 @@ class AffinityMatcher():
                  output_dim=2,
                  optimizer='Adam',
                  lr=1e-1,
-                 init='random',
+                 init='pca',
                  verbose=True,
                  tol=1e-4,
                  max_iter=100,
@@ -208,7 +208,7 @@ class SNEkhorn(AffinityMatcher):
     lr : float, optional
         Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
     init : str, optional
-        Initialization of embedding Z among ['random', 'pca'], default 'random'.
+        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
     tol : float, optional
         Precision threshold at which the algorithm stops, by default 1e-4.
     max_iter : int, optional
@@ -258,7 +258,7 @@ class SNEkhorn(AffinityMatcher):
                  student_kernel=False,  # True for tSNEkhorn
                  optimizer='Adam',
                  lr=1e-1,
-                 init='random',
+                 init='pca',
                  tol=1e-4,
                  max_iter=100,
                  lr_sea=1e-1,
@@ -322,7 +322,7 @@ class SNE(AffinityMatcher):
     lr : float, optional
         Learning rate for the algorithm, usually in the range [1e-5, 10], by default 1e-1.
     init : str, optional
-        Initialization of embedding Z among ['random', 'pca'], default 'random'.
+        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
     tol : float, optional
         Precision threshold at which the algorithm stops, by default 1e-4.
     max_iter : int, optional
@@ -352,7 +352,7 @@ class SNE(AffinityMatcher):
                  student_kernel=False,  # True for tSNE
                  optimizer='Adam',
                  lr=1e-1,
-                 init='random',
+                 init='pca',
                  tol=1e-4,
                  max_iter=100,
                  tol_ea=1e-5,
