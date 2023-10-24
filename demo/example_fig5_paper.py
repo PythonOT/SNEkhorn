@@ -35,13 +35,13 @@ Z = torch.normal(0, 1, size=(n, 2), dtype=torch.double)
 
 #%%
 perp=30
-sne = SNE(perp=perp, lr=1e-1, max_iter=500)
+sne = SNE(perp=perp, lr=1e-1, max_iter=500, init="random")
 sne.fit(X)
 P_SNE = sne.PX_
 print('Perplexities of the rows are {}'.format(torch.exp(entropy(P_SNE)-1)))
 
 #%%
-snekhorn = SNEkhorn(perp=perp, lr=1e-1, max_iter=500, lr_sea=1e1, max_iter_sea=3000)
+snekhorn = SNEkhorn(perp=perp, lr=1e-1, max_iter=500, lr_sea=1e1, max_iter_sea=3000, init="random")
 snekhorn.fit(X)
 P_SE = snekhorn.PX_
 print('Perplexities of the rows are {}'.format(torch.exp(entropy(P_SNE)-1)))
@@ -74,7 +74,7 @@ ticks_loc = cb0.ax.get_yticks().tolist()
 cb0.ax.yaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
 cb0.ax.set_yticklabels([f'{i:.0e}' for i in cb0.get_ticks()])
 cb0.ax.tick_params(labelsize=fs-5)
-# cb0.set_ticks([])
+cb0.set_ticks([])
 
 axs[2].set_title(r'$\mathbf{P}^{\mathrm{se}}$', fontsize=fs)
 axs[2].set_xticks([])
@@ -90,7 +90,7 @@ ticks_loc = cb2.ax.get_yticks().tolist()
 cb2.ax.yaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
 cb2.ax.set_yticklabels([f'{i:.0e}' for i in cb2.get_ticks()])
 cb2.ax.tick_params(labelsize=fs-5)
-# cb2.set_ticks([])
+cb2.set_ticks([])
 
 # clb2 = fig.colorbar(im2, ax=axs[2])
 
@@ -108,5 +108,4 @@ axs[3].set_xticks([])
 axs[3].set_yticks([])
 
 # fig.tight_layout(pad=1.0)
-#plt.savefig('heteroscedastic_noise.pdf', bbox_inches='tight')  
-# %%
+# plt.savefig('heteroscedastic_noise.pdf', bbox_inches='tight')
