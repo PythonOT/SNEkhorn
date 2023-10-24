@@ -36,12 +36,12 @@ class AffinityMatcher():
         If affinity_data is "precomputed" then a affinity matrix (instead of a BaseAffinity object) is needed as input for the fit method.
     output_dim : int, optional
         Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
-    optimizer : str, optional
-        Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+    optimizer : {'SGD', 'Adam', 'NAdam'}, optional
+        Which pytorch optimizer to use, by default 'Adam'.
     lr : float, optional
         Learning rate for the algorithm, by default 1.0.
-    init : str, optional
-        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
+    init : {'random', 'pca'} or torch.Tensor of shape (n_samples, output_dim), optional 
+        Initialization for the embedding Z, default 'pca'.
     verbose : bool, optional
         Verbosity, by default True.
     tol : float, optional
@@ -90,7 +90,7 @@ class AffinityMatcher():
         self.affinity_data = affinity_data
         self.affinity_embedding = affinity_embedding
         self.output_dim = output_dim
-        if init not in ['random', 'pca']:
+        if init not in ['random', 'pca'] and not isinstance(init, torch.Tensor):
             raise NotImplementedError(
                 '{} initialisation strategy is not valid'.format(init))
         self.init = init
@@ -144,9 +144,14 @@ class AffinityMatcher():
 
         self.PX_ = PX_
         losses = []
-        if self.init == "random":  # To add different initialization strategies
+        if isinstance(self.init, torch.Tensor):  # Z embedding
+            if self.init.shape[0] != n or self.init.shape[1] != self.output_dim:
+                raise WrongParameter('Init tensor must be of shape {0} but found {1}'.format(
+                    (n, self.output_dim), self.init.shape))
+            embedding = self.init
+        elif self.init == "random":
             embedding = torch.normal(0, 1, size=(
-                n, self.output_dim), dtype=torch.double)  # Z embedding
+                n, self.output_dim), dtype=torch.double)
         elif self.init == "pca":
             pca = PCA(n_components=self.output_dim)
             embedding = pca.fit_transform(X)
@@ -208,12 +213,12 @@ class SNEkhorn(AffinityMatcher):
     student_kernel : bool, optional
         Whether to use a normalized (symmetric + bistochastic) t-Student kernel instead of a Gaussian kernel in Z. 
         If True it computes tSNEkhorn instead of SNEkhorn (see [1]), by default False.
-    optimizer : str, optional
-        Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+    optimizer : {'SGD', 'Adam', 'NAdam'}, optional
+        Which pytorch optimizer to use, by default 'Adam'.
     lr : float, optional
         Learning rate for the algorithm, by default 1.0.
-    init : str, optional
-        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
+    init : {'random', 'pca'} or torch.Tensor of shape (n_samples, output_dim), optional 
+        Initialization for the embedding Z, default 'pca'.
     tol : float, optional
         Precision threshold at which the algorithm stops, by default 1e-4.
     max_iter : int, optional
@@ -233,7 +238,7 @@ class SNEkhorn(AffinityMatcher):
     init_sinkhorn : torch.Tensor of shape (n_samples), optional
         Initialization for the dual variable of the Sinkhorn algorithm, by default None.
     max_iter_sinkhorn : int, optional
-         Number of maximum iterations for the Sinkhorn algorithm, by default 50.
+         Number of maximum iterations for the Sinkhorn algorithm, usually only few iterations are required, by default 5.
     tol_sinkhorn : float, optional
          Precision threshold at which the Sinkhorn algorithm stops, by default 1e-5.
     verbose : bool, optional
@@ -272,7 +277,7 @@ class SNEkhorn(AffinityMatcher):
                  square_parametrization=False,
                  eps=1.0,  # Regularization for Sinkhorn
                  init_sinkhorn=None,
-                 max_iter_sinkhorn=50,
+                 max_iter_sinkhorn=5,
                  tol_sinkhorn=1e-5,
                  verbose=True,
                  tolog=False):
@@ -322,12 +327,12 @@ class SNE(AffinityMatcher):
     student_kernel : bool, optional
         Whether to use a t-Student kernel instead of a Gaussian kernel in the embedding space. 
         If True it computes tSNE instead of SNE, by default False.
-    optimizer : str, optional
-        Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+    optimizer : {'SGD', 'Adam', 'NAdam'}, optional
+        Which pytorch optimizer to use, by default 'Adam'.
     lr : float, optional
         Learning rate for the algorithm, by default 1.0.
-    init : str, optional
-        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
+    init : {'random', 'pca'} or torch.Tensor of shape (n_samples, output_dim), optional 
+        Initialization for the embedding Z, default 'pca'.
     tol : float, optional
         Precision threshold at which the algorithm stops, by default 1e-4.
     max_iter : int, optional
@@ -420,14 +425,12 @@ class DRWrapper(AffinityMatcher):
         If not provided default parameters, by default {}.
     output_dim : int, optional
         Dimension of the embedded space (corresponds to the number of features of Z), by default 2.
-    optimizer : str, optional
-        _description_, by default 'Adam'
-    optimizer : str, optional
-        Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+    optimizer : {'SGD', 'Adam', 'NAdam'}, optional
+        Which pytorch optimizer to use, by default 'Adam'.
     lr : float, optional
         Learning rate for the algorithm, by default 1.0.
-    init : str, optional
-        Initialization of embedding Z among ['random', 'pca'], default 'pca'.
+    init : {'random', 'pca'} or torch.Tensor of shape (n_samples, output_dim), optional 
+        Initialization for the embedding Z, default 'pca'.
     tol : float, optional
         Precision threshold at which the algorithm stops, by default 1e-4.
     max_iter : int, optional
