@@ -2,6 +2,8 @@
 
 Implementation of the paper [SNEkhorn: Dimension Reduction with Symmetric Entropic Affinities](https://hal.science/hal-04103326) (NeurIPS 2023). SNEkhorn is a dimension reduction method based on optimal transport and symmetric entropic affinities. 
 
+
+
 Feel free to ask if any question.
 
 To intall the toobox run the following code in a shell:
@@ -30,6 +32,9 @@ url={https://openreview.net/forum?id=y9U0IJ2uFr}
 	- [example_affinities.py](/demo/example_affinities.py): illustrates the toolbox for calculating the symmetric entropic affinities.
 	- [example_simple_snekhorn.py](/demo/example_simple_snekhorn.py): simple example that uses SNEkhorn.
     - [example_coil.py](/demo/example_coil.py): comparison of tSNE/tSNEkhorn on COIL dataset.
+	- [example_fig5_paper.py](/demo/example_fig5_paper.py): replicate the Figure 5 of the paper.
+	
+* You can compare the performances of SNEkhorn on SNAREseq/COIL data by running the files in the expes folder. 
 
 ### Prerequisites
 
