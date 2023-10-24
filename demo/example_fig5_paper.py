@@ -44,7 +44,7 @@ print('Perplexities of the rows are {}'.format(torch.exp(entropy(P_SNE)-1)))
 snekhorn = SNEkhorn(perp=perp, lr=1e-1, max_iter=500, lr_sea=1e1, max_iter_sea=3000, init="random")
 snekhorn.fit(X)
 P_SE = snekhorn.PX_
-print('Perplexities of the rows are {}'.format(torch.exp(entropy(P_SNE)-1)))
+print('Perplexities of the rows are {}'.format(torch.exp(entropy(P_SE)-1)))
 
 #%%
 Z_sne = sne.embedding_
