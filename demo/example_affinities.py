@@ -1,4 +1,4 @@
-#%%
+#%% A very simple example to illustrate the use of the Affinity framework
 import torch
 import matplotlib.pyplot as plt
 import ot
@@ -14,7 +14,7 @@ X2 = torch.Tensor([0,8])[None,:] + torch.normal(0, 3, size=(n, 2), dtype=torch.d
 X3 = torch.Tensor([8,-8])[None,:] + torch.normal(0, 2, size=(n, 2), dtype=torch.double)
 X = torch.cat([X1,X2,X3], 0)
 perp = 5
-SEA = SymmetricEntropicAffinity(perp=perp, lr=1e-2)
+SEA = SymmetricEntropicAffinity(perp=perp, lr=1e-1, max_iter=1000, square_parametrization=True)
 bisto_a = BistochasticAffinity(eps=2)
 EA = EntropicAffinity(perp=perp, normalize_as_sne=True)
 K = torch.exp(-torch.cdist(X,X)**2/2.0)
@@ -23,9 +23,6 @@ K = torch.exp(-torch.cdist(X,X)**2/2.0)
 Pds = bisto_a.compute_affinity(X)
 Psne = EA.compute_affinity(X)
 Pse = SEA.compute_affinity(X)
-#%%
-from snekhorn.utils import 
-print('Perplexities of the rows are {}'.format(torch.exp(entropy(P_SNE)-1)))
 
 #%%
 plt.close('all')

@@ -208,8 +208,8 @@ class SymmetricEntropicAffinity(BaseAffinity):
             Precision threshold at which the algorithm stops, by default 1e-5.
         max_iter : int, optional
             Number of maximum iterations for the algorithm, by default 500.
-        optimizer : str, optional
-            Which pytorch optimizer to use among ['SGD', 'Adam', 'NAdam'], by default 'Adam'.
+        optimizer : {'SGD', 'Adam', 'NAdam'}, optional
+            Which pytorch optimizer to use, by default 'Adam'.
         verbose : bool, optional
             Verbosity, by default True.
         tolog : bool, optional
