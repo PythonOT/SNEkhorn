@@ -141,7 +141,7 @@ class EntropicAffinity(BaseAffinity):
             Affinity matrix in log space. If normalize_as_sne is True returns the symmetrized affinty in log space.
         """
         C = torch.cdist(X, X, 2)**2
-        log_P = self.entropic_affinity(C)
+        log_P = self._solve_dual(C)
         if self.normalize_as_sne:  # does P+P.T/2 in log space
             log_P_SNE = torch.logsumexp(torch.stack(
                 [log_P, log_P.T], 0), 0, keepdim=False) - math.log(2)
@@ -149,7 +149,7 @@ class EntropicAffinity(BaseAffinity):
         else:
             return log_P
 
-    def entropic_affinity(self, C):
+    def _solve_dual(self, C):
         """Performs a binary search to solve the dual problem of entropic affinities in log space.
         It solves the problem (EA) in [1] and returns the entropic affinity matrix in log space (which is **not** symmetric).
 
@@ -255,10 +255,10 @@ class SymmetricEntropicAffinity(BaseAffinity):
             Affinity matrix in log space. 
         """
         C = torch.cdist(X, X, 2)**2
-        log_P = self.symmetric_entropic_affinity(C)
+        log_P = self._solve_dual(C)
         return log_P
 
-    def symmetric_entropic_affinity(self, C):
+    def _solve_dual(self, C):
         """Solves the dual optimization problem (Dual-SEA) in [1] and returns the corresponding symmetric entropic affinty in log space.
 
         Parameters
@@ -427,10 +427,10 @@ class BistochasticAffinity(BaseAffinity):
         # If student is True, considers the Student-t kernel instead of Gaussian RBF
         if self.student:
             C = torch.log(1+C)
-        log_P = self.log_selfsink(C)
+        log_P = self._solve_dual(C)
         return log_P
 
-    def log_selfsink(self, C):
+    def _solve_dual(self, C):
         """Performs Sinkhorn iterations in log domain to solve the entropic "self" (or "symmetric") OT problem with symmetric cost C and entropic regularization eps.
 
         Parameters
