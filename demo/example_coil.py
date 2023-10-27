@@ -48,8 +48,8 @@ scatter_kwargs_coil = {'s': 5, 'alpha': 0.8,
                        'c': Y_coil, 'cmap': plt.get_cmap('tab20')}
 
 
-params = {'text.usetex': True,
-          'text.latex.preamble': [r'\usepackage{cmbright}', r'\usepackage{amsmath}']}
+params = {'text.usetex': True}
+        #   'text.latex.preamble': [r'\usepackage{cmbright}', r'\usepackage{amsmath}']}
 plt.rcParams.update(params)
 
 plt.rc('font', family='Times New Roman')

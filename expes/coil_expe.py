@@ -11,6 +11,7 @@ from snekhorn.affinities import SymmetricEntropicAffinity, NanError
 from snekhorn.dimension_reduction import DRWrapper
 from sklearn import metrics
 from sklearn.manifold import trustworthiness
+from snekhorn.dimension_reduction import SNE as OurSNE
 
 torch.manual_seed(16)
 # %% Load the COIL dataset
@@ -56,13 +57,18 @@ simpletsnekhorn = DRWrapper(affinity_data='precomputed',
                             max_iter=max_iter)
 silhouette_scores = {}
 trustworthiness_scores = {}
-for model, name in zip([simpletsnekhorn, tsnekhorn, None],
-                       ['Simple tSNEkhorn', 'tSNEkhorn', 'tSNE (sklearn)']):
+for model, name in zip([simpletsnekhorn, tsnekhorn, None, None],
+                       ['Simple tSNEkhorn', 'tSNEkhorn', 'tSNE (sklearn)', 'tSNE (vanilla)']):
     for i, perp in enumerate(perps_test):
         if name == 'tSNE (sklearn)':
             tsne_sklearn = TSNE(perplexity=perp, learning_rate=lr)
             tsne_sklearn.fit(X_process.numpy())
             emb = torch.from_numpy(tsne_sklearn.embedding_)
+        elif name == 'tSNE (vanilla)': #we also compare with our vanilla implementation of tSNE
+            our_tsne = OurSNE(perp=perp, lr=lr, student_kernel=True,
+                              max_iter_ea=1000, max_iter=max_iter, verbose=True)
+            our_tsne.fit(X_coil)
+            emb = our_tsne.embedding_
         else:
             PX_ = all_affinities[perp]
             model.fit(PX_)
@@ -86,7 +92,7 @@ fig, ax = plt.subplots(1, 2, figsize=(10, 5))
 j = 0
 for name_score, dic_score in zip(['Silhouette', 'Trustworthiness'],
                                  [silhouette_scores, trustworthiness_scores]):
-    for i, name in enumerate(['Simple tSNEkhorn', 'tSNEkhorn', 'tSNE (sklearn)']):
+    for i, name in enumerate(['Simple tSNEkhorn', 'tSNEkhorn', 'tSNE (sklearn)', 'tSNE (vanilla)']):
         ax[j].plot(perps_test, dic_score[name],
                    marker='o', c=cmap(i), lw=3, label=name)
     ax[j].legend(fontsize=fs-2)

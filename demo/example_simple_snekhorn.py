@@ -31,6 +31,8 @@ Zsnekhorn = tsnekhorn.embedding_
 plt.scatter(X[:, 0], X[:, 1], label='data')
 plt.scatter(Zsnekhorn[:, 0], Zsnekhorn[:, 1], label='tsnekhorn embedding')
 plt.legend()
+plt.show()
+
 # %% We can also use the precomputed method this way
 
 symmetric_entropic_affinity = SymmetricEntropicAffinity(
@@ -48,6 +50,8 @@ Zsnekhorn = snekhorn_precomputed.embedding_
 plt.scatter(X[:, 0], X[:, 1], label='data')
 plt.scatter(Zsnekhorn[:, 0], Zsnekhorn[:, 1], label='tsnekhorn embedding')
 plt.legend()
+plt.show()
+
 # %% The DRWrapper can also be used to quickly change from one affinity to the other
 params_affinity_data = {'lr': 0.1, 'max_iter': 500,  # if not provided default parameters
                         'square_parametrization': True}
@@ -64,4 +68,5 @@ plt.scatter(X[:, 0], X[:, 1], label='data')
 plt.scatter(general_dr.embedding_[:, 0], general_dr.embedding_[
             :, 1], label='embedding')
 plt.legend()
+plt.show()
 # %%

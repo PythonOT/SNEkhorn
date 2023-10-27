@@ -1,7 +1,6 @@
 #%% A very simple example to illustrate the use of the Affinity framework
 import torch
 import matplotlib.pyplot as plt
-import ot
 from matplotlib import cm
 import numpy as np
 from snekhorn.affinities import SymmetricEntropicAffinity, EntropicAffinity, BistochasticAffinity
@@ -39,7 +38,7 @@ plt.title(r"Gaussian Kernel ($\nu$=2)")
 plt.subplot(1,3,3)
 
 Kvisu = K.detach().numpy()
-for i in range(n):
+for i in range(3*n):
     for j in range(i):
         if K[i,j]>1e-2:
             plt.plot([X[i,0], X[j,0]], [X[i,1], X[j,1]], color='black', alpha=Kvisu[i,j].item())
@@ -67,7 +66,7 @@ plt.title(r"Doubly Stochastic Aff. ($\nu$=2)")
 plt.subplot(1,3,3)
 
 
-for i in range(n):
+for i in range(3*n):
     for j in range(i):
         if K[i,j]>1e-6:
             plt.plot([X[i,0], X[j,0]], [X[i,1], X[j,1]], color='black', alpha=min(Kvisu[i,j]*scale,1))
@@ -96,8 +95,8 @@ plt.title(r"Entropic Aff. ($\xi$=5)")
 plt.subplot(1,3,3)
 
 
-for i in range(n):
-    for j in range(n):
+for i in range(3*n):
+    for j in range(i):
         if K[i,j]*scale>1e-5:
             plt.plot([X[i,0], X[j,0]], [X[i,1], X[j,1]], color='black', alpha=min(Kvisu[i,j]*scale,1))
 plt.scatter(X[:,0], X[:,1],alpha=0.5)
@@ -124,8 +123,8 @@ plt.title(r"Sym. Entropic Aff. ($\xi$=5)")
 plt.subplot(1,3,3)
 
 
-for i in range(n):
-    for j in range(n):
+for i in range(3*n):
+    for j in range(i):
         if K[i,j]*scale>1e-5:
             plt.plot([X[i,0], X[j,0]], [X[i,1], X[j,1]], color='black', alpha=min(Kvisu[i,j]*scale,1))
 plt.scatter(X[:,0], X[:,1],alpha=0.5)

@@ -37,6 +37,7 @@ class BaseAffinity():
             Affinity matrix.
         """
         log_P = self.compute_log_affinity(X)
+        self.data = torch.exp(log_P)
         return torch.exp(log_P)
 
 
